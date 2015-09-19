@@ -27,6 +27,8 @@
 struct addrinfo hints, *res;
 struct timeval oldtime, newtime;
 
+char pr_str[200];
+
 void
 usage(const char *name0)
 {
@@ -65,9 +67,9 @@ print(void)
 		tv_sec = newtime.tv_sec - oldtime.tv_sec - 1;
 	}
 	if(tv_sec == 0) {
-		sprintf(buf, "%d ms", tv_usec / 1000);
+		sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000);
 	} else {
-		sprintf(buf, "%d ms", tv_usec / 1000 + tv_sec);
+		sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000 + tv_sec);
 	}
 	puts(buf);
 	sleep(1);
@@ -104,6 +106,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "不能解析地址\n");
         exit(1);
     }
+
+    sprintf(pr_str, "TCPPING %s:%s -- ", path, port);
 
 	int epfd = epoll_create(1024);
 	struct epoll_event events[20];
