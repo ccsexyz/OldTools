@@ -19,7 +19,11 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#if defined(__linux__) || defined (__linux)
 #include <sys/epoll.h>
+#elif defined(__APPLE__) && defined (__MACH__)
+#include <sys/event.h>
+#endif
 #include <sys/time.h>
 #include <errno.h>
 
@@ -92,23 +96,10 @@ nonb_connect(int fd)
 	}
 }
 
-int main(int argc, char **argv)
+#if defined(__linux__) || defined (__linux)
+void
+do_epoll()
 {
-	if(argc != 3)
-		usage(argv[0]);
-
-	char *path = argv[1];
-	char *port = argv[2];
-	memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    if(getaddrinfo(path, port, &hints, &res) == -1) {
-        fprintf(stderr, "不能解析地址\n");
-        exit(1);
-    }
-
-    sprintf(pr_str, "TCPPING %s:%s -- ", path, port);
-
 	int epfd = epoll_create(1024);
 	struct epoll_event events[20];
 
@@ -134,4 +125,64 @@ gogogo:
 		close(sockfd);
 		epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, NULL);
 	}
+}
+#elif defined(__APPLE__) && defined (__MACH__)
+void
+do_kqueue()
+{
+	int kq = kqueue();
+	if(kq == -1) {
+		perror("create kq error!");
+		exit(1);
+	}
+
+	while(1) {
+		int sockfd;
+		if((sockfd = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) == -1) {
+	        fprintf(stderr, "socket error: %s\n", strerror(errno));
+	        return;
+	    }
+		set_noblock(sockfd);
+		struct kevent changes[1];
+		EV_SET(&changes[0], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+		kevent(kq, changes, 1, NULL, 0, NULL);
+		int ret = nonb_connect(sockfd);
+		if(ret)
+			goto gogogo;
+		struct kevent events[10];
+		struct timespec timeout = {3, 0};
+		int r = kevent(kq, NULL, 0, events, 10, &timeout);
+		if(r == 0) {
+			printf("timeout !\n");
+		} else {
+			print();
+		}
+gogogo:
+		close(sockfd);
+	}
+}
+#endif
+
+int main(int argc, char **argv)
+{
+	if(argc != 3)
+		usage(argv[0]);
+
+	char *path = argv[1];
+	char *port = argv[2];
+	memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    if(getaddrinfo(path, port, &hints, &res) == -1) {
+        fprintf(stderr, "不能解析地址\n");
+        exit(1);
+    }
+
+    sprintf(pr_str, "TCPPING %s:%s -- ", path, port);
+	#if defined(__linux__) || defined (__linux)
+	do_epoll();
+	#elif defined(__APPLE__) && defined (__MACH__)
+	do_kqueue();
+	#endif
+
 }
