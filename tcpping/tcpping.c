@@ -32,11 +32,12 @@ struct addrinfo hints, *res;
 struct timeval oldtime, newtime;
 
 char pr_str[200];
+int sleep_time = 1000; //ms, 1000 = 1s
 
 void
 usage(const char *name0)
 {
-	printf("usage: %s path port!\n", name0);
+	printf("usage: %s path port [sleep time(ms)]!\n", name0);
 	exit(1);
 }
 
@@ -76,7 +77,7 @@ print(void)
 		sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000 + tv_sec);
 	}
 	puts(buf);
-	sleep(1);
+	usleep(1000 * sleep_time);
 }
 
 int
@@ -165,11 +166,16 @@ gogogo:
 
 int main(int argc, char **argv)
 {
-	if(argc != 3)
+	if(argc != 3 && argc != 4)
 		usage(argv[0]);
 
 	char *path = argv[1];
 	char *port = argv[2];
+    if(argc == 4) {
+        int sleep_time0 = atoi(argv[3]);
+        if(sleep_time0 >= 0)
+            sleep_time = sleep_time0;
+    }
 	memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
