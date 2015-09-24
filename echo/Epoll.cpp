@@ -49,7 +49,7 @@ Event::Event(int fd0)
         std::exit(1);
     }
 
-    event.data.ptr = this;
+    event.data.ptr = static_cast<void *>(this);
     event.events = EPOLLIN | EPOLLET;
 }
 

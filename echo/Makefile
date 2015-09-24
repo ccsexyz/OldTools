@@ -9,5 +9,5 @@ main.o: main.cpp Implement.h Epoll.h
 Implement.o: Implement.cpp Implement.h
 	$(cc) -c Implement.cpp -std=c++11
 
-Epoll.o: Epoll.o Epoll.h
+Epoll.o: Epoll.cpp Epoll.h
 	$(cc) -c Epoll.cpp -std=c++11

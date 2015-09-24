@@ -9,6 +9,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
+#include <string.h>
+
 
 
 class Implement {
