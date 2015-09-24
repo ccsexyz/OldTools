@@ -48,6 +48,9 @@ Event::Event(int fd0)
         std::cerr << "bad alloc for Event" << std::endl;
         std::exit(1);
     }
+
+    event.data.ptr = this;
+    event.events = EPOLLIN | EPOLLET;
 }
 
 bool

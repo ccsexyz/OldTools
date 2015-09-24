@@ -31,6 +31,15 @@ public:
     ev_callback read_callback = nullptr;
 
     Event(int fd0);
+    Event() = default;
+    ~Event()
+    {
+        close(fd);
+        if(buf != nullptr)
+            delete[] buf;
+        if(wbuf != nullptr)
+            delete[] wbuf;
+    }
     bool Read();
     bool Write();
 };
@@ -51,6 +60,29 @@ public:
     int get_epoll_fd() const { return epollfd; }
     void epoll_main_event_loop(epoll_event_handler event_handler);
     void disable_loop() { flag = false; }
+    void ctl(int op, int fd, struct epoll_event *e)
+    {
+        if(fd < 0 || op < 0 || e == nullptr) {
+            std::cerr << "invalid args for epoll_ctl!" << std::endl;
+            return;
+        }
+
+        if(epoll_ctl(epollfd, op, fd, e) < 0) {
+            std::cerr << "epoll_ctl error!" << std::endl;ß
+        }
+    }
+    void add(int fd, struct epoll_event *e)
+    {
+        ctl(EPOLL_CTL_ADD, fd, e);
+    }
+    void del(int fd, struct epoll_event *e)
+    {
+        ctl(EPOLL_CTL_DEL, fd, e);
+    }
+    void mod(int fd, struct epoll_event *e)
+    {
+        ctl(EPOLL_CTL_MOD, fd, e);
+    }
 private:
     bool flag = true;
     int epollfd = 0;
