@@ -9,6 +9,8 @@
 #include <utility>
 #include <boost/asio.hpp>
 
+using boost::asio::ip::tcp;
+
 typedef struct message_ {
     char magic_word[8];
     uint32_t message_type;
@@ -55,8 +57,8 @@ private: //private functions
     void do_read()
     {
         auto self(shared_from_this());
-        socket_.async_read_some(boost::asio:buffer(buf, buffer_length),
-            [this, self](boost::system::error_code ec, std::size_t length));
+        //socket_.async_read_some(boost::asio::buffer(buf, buffer_length),
+            //[this, self](boost::system::error_code ec, std::size_t length));
     }
 
     void do_read_login_message()
@@ -133,7 +135,7 @@ private: //private functions
 
             //std::weak_ptr<chat_session> weak_self(self);
             //dest_client->chat_queue_add(std::move(weak_self));
-        }
+        };
     }
 
     void do_write_chat_message()
@@ -154,8 +156,8 @@ private:
 
     std::string username_;
     chat_server *server_;
-    static uint32_t next_id = 1;
-}
+    static uint32_t next_id;
+};
 
 class chat_server
 {
@@ -233,7 +235,7 @@ public:
     {
         auto i = client_id_.find(id);
         if(i != client_id_.end()) {
-            auto &weak_client = n->second;
+            auto &weak_client = i->second;
             return weak_client;
             /*
             if(weak_client.expired()) return;
@@ -259,4 +261,4 @@ private:
     std::map<std::string, std::weak_ptr<chat_session>> client_name_;
     std::map<uint32_t, std::weak_ptr<chat_session>> client_id_;
     std::map<chat_session *, std::shared_ptr<chat_session>> client_;
-}
+};
