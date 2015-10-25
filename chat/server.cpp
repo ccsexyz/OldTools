@@ -17,6 +17,17 @@ chat_session::chat_session(tcp::socket socket, chat_server *server)
 }
 
 void
+chat_session::do_read()
+{
+    auto self(shared_from_this());
+    socket_.async_read_some(boost::asio::buffer(buf, buffer_length),
+        [this, self](boost::system::error_code ec, std::size_t length)
+    {
+        ;
+    });
+}
+
+void
 chat_session::do_read_login_message()
 {
     auto self(shared_from_this());
