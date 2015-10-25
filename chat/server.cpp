@@ -97,8 +97,26 @@ chat_session::do_read_chat_message()
 }
 
 
-int main(void)
+int main(int argc, char **argv)
 {
-    printf("hello  world!\n");
+    try {
+        if(argc < 2) {
+            std::cerr << "usage: echo: chat_server <port> [<port> ... ]" << std::endl;
+            return argc;
+        }
+
+        boost::asio::io_service io_service;
+
+        std::vector<chat_server> servers;
+        for(int i = 1; i < argc; i++) {
+            tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
+            servers.emplace_back(io_service, endpoint);
+        }
+
+        io_service.run();
+    } catch(...) {
+        std::cerr << "error occur!" << std::endl;
+    }
+
     return 0;
 }
