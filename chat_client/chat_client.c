@@ -31,6 +31,7 @@ connect_tcp(const char *host, const char *port)
     int ret;
     ret = connect(sockfd, res->ai_addr, res->ai_addrlen);
     if(ret < 0) {
+        printf("connect error: %s\n", strerror(errno));
         close(sockfd);
         goto errout;
     }

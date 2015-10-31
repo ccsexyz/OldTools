@@ -66,7 +66,8 @@ Event::Read()
         if(ret == 0 || errno != EAGAIN) {
             flag = false;
         }
-        read_callback(NULL);
+        if(read_callback != nullptr)
+            read_callback(NULL);
         return false;
     }
 }
