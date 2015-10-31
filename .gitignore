@@ -1,1 +1,10 @@
 *.o
+*.lib
+*.so
+chat/chat
+chat_client/chat_client
+echo/echo
+HuffmanCompress/HuffmanCompress
+HuffmanCompress/HuffmanDecompress
+tcpping/tcpping
+time_server/time_server
