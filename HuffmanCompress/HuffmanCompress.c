@@ -12,26 +12,30 @@ unsigned char key_buf[4096];
 int keybuf_off;
 
 typedef struct item_ {
-    unsigned char num;
-    int ntimes;
-    int flag;
-    char result_string[20];
-    int result_string_length;
-    unsigned char result[4];
-    int result_length; //1 - 4
+    unsigned char num;          //原始数据，长度为一个字节
+    int ntimes;                 //此数据在文件中出现的次数
+    int flag;                   //
+    char result_string[20];     //哈弗曼编码的字符串表示
+    int result_string_length;   //哈弗曼的字符串长度
+    unsigned char result[4];    //哈弗曼编码结果在文件中表示，
+                                //注意，在文件中时，一位的哈弗曼编码将被表示成两位,
+                                //01 -> 1 10 -> 0 00 or 11 -> end [end表示哈弗曼编码结束] [不足一个字节的补0]
+                                //这样主要是为了将哈弗曼编码保存到目标文件时以一种可扩展的方式保存而不用维护其长度字段
+                                //举例: 1000的哈弗曼编码将表示为 0110101000 补0后为 0110101000000000 长度为2个字节
+    int result_length;          //哈弗曼编码字节数，1 - 4
 
-    struct item_ *left, *right;
+    struct item_ *left, *right; //哈弗曼树的左右子节点
 } item_t;
 
 typedef struct num_key_ {
-    unsigned char num;
-    unsigned char result_key[0];
+    unsigned char num;          //原始数据
+    unsigned char result_key[0];//处理后的哈弗曼编码，每两个位表示哈弗曼编码一个位
 } num_key_t;
 
 typedef struct head_ {
-    char magic_word[8];
-    long file_size;
-    int non_zero_nums;
+    char magic_word[8];         //压缩文件魔术字，”ccsexyz”
+    long file_size;             //压缩前的文件长度
+    int non_zero_nums;          //在原文件中出现次数不为0的字节数，即被编码的字节数
 } head_t;
 
 void
