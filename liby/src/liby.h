@@ -2,12 +2,18 @@
 #include "socket.h"
 
 typedef struct liby_server_ {
+    int type;
     char *server_name;
     char *server_port;
     int listenfd;
 
     epoller_t *loop;
 } liby_server;
+
+typedef struct liby_client_ {
+    int type;
+
+} liby_client;
 
 liby_server *liby_server_init(const char *server_name, const char *server_port);
 void liby_server_destroy(liby_server *server);
@@ -64,4 +70,28 @@ add_server_to_epoller(liby_server *server, epoller_t *loop)
     if(loop->running_servers == 0)
         loop->flag = !0;
     loop->running_servers++;
+}
+
+void
+epoll_event_handler(epoller_t *loop, int n)
+{
+    for(int i = 0; loop->flag && (i < n); i++) {
+        struct epoll_event *p = &(loop->events[i]);
+
+        liby_server *server = (liby_server *)(p->data.ptr);
+
+        if(server->type) {
+            ;
+            continue;
+        }
+
+        liby_client *client = (liby_client *)(p->data.ptr);
+        if(p->events & EPOLLHUP) {
+            ;
+        } else if(p->events & EPOLLIN) {
+            ;
+        } else if(p->events & EPOLLOUT) {
+            ;
+        }
+    }
 }
