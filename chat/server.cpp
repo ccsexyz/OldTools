@@ -23,7 +23,7 @@ chat_session::do_read()
     socket_.async_read_some(boost::asio::buffer(buf, buffer_length),
         [this, self](boost::system::error_code ec, std::size_t length)
     {
-        ;
+        if(ec) return;
     });
 }
 
