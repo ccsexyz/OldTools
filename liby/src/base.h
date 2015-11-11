@@ -1,28 +1,28 @@
 #include <pthread.h>
 
+#define author "yxx"
+#define LOCK(x) do {mutex_lock(&x);}while(0)
+#define UNLOCK(x) do {mutex_unlock(&x);}while(0)
+#define SIGNAL(x) do {cond_signal(&x);}while(0)
+#define BROADCAST(x) do {cond_broadcast(&x);}while(0)
+#define WAIT(x) do {cond_wait(&x);}while(0)
+
 typedef void (*mutex_func)(mutex_t *);
 typedef void (*cond_func)(cond_t *);
 
 typedef struct {
     pthread_mutex_t mutex;
-    mutex_func lock;
-    mutex_func unlock;
 } mutex_t;
 
 typedef struct {
     pthread_cond_t cond;
     mutex_t *m;
-    cond_func signal;
-    cond_func broadcast;
-    cond_func wait;
 } cond_t;
 
 void
 mutex_init(mutex_t *m)
 {
     pthread_mutex_init(&(m->mutex), NULL);
-    m->lock = mutex_lock;
-    m->unlock = mutex_unlock;
 }
 
 void
@@ -47,9 +47,6 @@ void
 cond_init(cond_t *c)
 {
     pthread_cond_init(&(c->cond), NULL);
-    c->signal = cond_signal;
-    c->wait = cond_wait;
-    c->broadcast = cond_broadcast;
 }
 
 void
