@@ -1,11 +1,11 @@
 #include <pthread.h>
 
 #define author "yxx"
-#define LOCK(x) do {mutex_lock(&x);}while(0)
-#define UNLOCK(x) do {mutex_unlock(&x);}while(0)
-#define SIGNAL(x) do {cond_signal(&x);}while(0)
-#define BROADCAST(x) do {cond_broadcast(&x);}while(0)
-#define WAIT(x) do {cond_wait(&x);}while(0)
+#define LOCK(x) do {mutex_lock(&(x));}while(0)
+#define UNLOCK(x) do {mutex_unlock(&(x));}while(0)
+#define SIGNAL(x) do {cond_signal(&(x));}while(0)
+#define BROADCAST(x) do {cond_broadcast(&(x));}while(0)
+#define WAIT(x) do {cond_wait(&(x));}while(0)
 
 typedef void (*mutex_func)(mutex_t *);
 typedef void (*cond_func)(cond_t *);
