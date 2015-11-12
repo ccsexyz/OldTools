@@ -3,7 +3,7 @@
 liby_server *
 liby_server_init(const char *server_path, const char *server_port)
 {
-    if(server_name == NULL || server_port == NULL) {
+    if(server_path == NULL || server_port == NULL) {
         fprintf(stderr, "server name or port must be valid!\n");
         return NULL;
     }
@@ -16,7 +16,10 @@ liby_server_init(const char *server_path, const char *server_port)
 
     server->server_path = path;
     server->server_port = port;
+    server->type = 1;
     server->listenfd = initserver(path, port);
+    set_noblock(server->listenfd);
+    printf("listenfd = %d\n", server->listenfd);
 
     return server;
 }
@@ -27,10 +30,10 @@ liby_server_destroy(liby_server *server)
     if(server) {
         if(server->server_path) free(server->server_path);
         if(server->server_port) free(server->server_port);
-        close(listenfd);
+        close(server->listenfd);
 
         if(server->buf_allocate_flag && server->buf) {
-            free(server->buf)
+            free(server->buf);
         }
 
         liby_client *p = server->head;
@@ -48,7 +51,7 @@ void
 add_server_to_epoller(liby_server *server, epoller_t *loop)
 {
     if(server == NULL || loop == NULL) {
-        fprintf(stderr, "server or epoller must be invalid!\n");
+        fprintf(stderr, "server or epoller must be valid!\n");
         return;
     }
 
@@ -56,7 +59,8 @@ add_server_to_epoller(liby_server *server, epoller_t *loop)
 
     struct epoll_event *event = &(loop->event);
     event->data.ptr = (void *)server;
-    event->events = EPOLLIN | EPOLLHUP;
+    event->events = EPOLLIN | EPOLLHUP | EPOLLET;
+    epoll_add(loop, server->listenfd);
 
     if(loop->running_servers == 0)
         loop->flag = !0;
@@ -64,7 +68,21 @@ add_server_to_epoller(liby_server *server, epoller_t *loop)
 }
 
 void
-epoll_event_handler(epoller_t *loop, int n)
+add_client_to_epoller(liby_client *client, epoller_t *loop)
+{
+    if(client == NULL || loop == NULL) {
+        fprintf(stderr, "%s\n", "client or epoller must be valid!\n");
+        return;
+    }
+
+    struct epoll_event *event = &(loop->event);
+    event->data.ptr = (void *)client;
+    event->events = EPOLLIN | EPOLLHUP | EPOLLET;
+    epoll_add(loop, client->sockfd);
+}
+
+void
+handle_epoll_event(epoller_t *loop, int n)
 {
     for(int i = 0; loop->flag && (i < n); i++) {
         struct epoll_event *p = &(loop->events[i]);
@@ -74,6 +92,8 @@ epoll_event_handler(epoller_t *loop, int n)
         if(server->type) {
             epoll_acceptor(server);
             continue;
+        } else {
+            printf("client!\n");
         }
 
         liby_client *client = (liby_client *)(p->data.ptr);
@@ -81,8 +101,10 @@ epoll_event_handler(epoller_t *loop, int n)
             del_client_from_server(client, client->server);
             continue;
         } else if(p->events & EPOLLIN) {
+            printf("some message in!\n");
             read_message(client);
         } else if(p->events & EPOLLOUT) {
+            printf("some message out!\n");
             write_message(client);
         }
     }
@@ -91,8 +113,8 @@ epoll_event_handler(epoller_t *loop, int n)
 void
 epoll_acceptor(liby_server *server)
 {
-    if(s == NULL) return;
-    int listen_fd = s->listen_fd;
+    if(server == NULL) return;
+    int listen_fd = server->listenfd;
 
     while(1) {
         int clfd = accept(listen_fd, NULL, NULL);
@@ -109,16 +131,20 @@ epoll_acceptor(liby_server *server)
 
         liby_client *client = liby_client_init(clfd, server);
         add_client_to_server(client, server);
+        add_client_to_epoller(client, server->loop);
 
-        if(server->acceptor)
+        if(server->acceptor) {
             server->acceptor((void *)client);
+        } else {
+            printf("no acceptor!\n");
+        }
     }
 }
 
 liby_client *
 liby_client_init(int fd, liby_server *server)
 {
-    if(s == NULL) {
+    if(server == NULL) {
         //
         close(fd);
         return NULL;
@@ -209,8 +235,10 @@ read_message(liby_client *client)
     }
 
     if(client->curr_read_task == NULL) {
-        client->curr_read_task = pop_io_task_from_client(client, true);
+        printf("curr_read_task = NULL!\n");
+        client->curr_read_task = pop_io_task_from_client(client, 1);
         if(client->curr_read_task == NULL) {
+            printf("no read task!\n");
             return;
         }
     }
@@ -223,6 +251,14 @@ read_message(liby_client *client)
             if(ret > 0) {
                 p->offset += ret;
                 if(p->offset >= p->min_except_bytes) {
+
+                    liby_server *server = client->server;
+                    epoller_t *loop = server->loop;
+                    struct epoll_event *event = &(loop->event);
+                    event->data.ptr = (void *)client;
+                    event->events = EPOLLHUP | EPOLLET;
+                    epoll_mod(loop, client->sockfd);
+
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
@@ -249,7 +285,7 @@ read_message(liby_client *client)
             }
         }
 
-        client->curr_read_task = pop_io_task_from_client(client, true);
+        client->curr_read_task = pop_io_task_from_client(client, 1);
         free(p);
     }
 }
@@ -265,7 +301,7 @@ write_message(liby_client *client)
     }
 
     if(client->curr_write_task == NULL) {
-        client->curr_write_task = pop_io_task_from_client(client, false);
+        client->curr_write_task = pop_io_task_from_client(client, 0);
         if(client->curr_write_task == NULL) {
             return;
         }
@@ -275,10 +311,19 @@ write_message(liby_client *client)
         io_task *p = client->curr_write_task;
 
         while(1) {
+            printf("try to write!\n");
             int ret = write(client->sockfd, p->buf + p->offset, p->size - p->offset);
             if(ret > 0) {
                 p->offset += ret;
                 if(p->offset >= p->min_except_bytes) {
+
+                    liby_server *server = client->server;
+                    epoller_t *loop = server->loop;
+                    struct epoll_event *event = &(loop->event);
+                    event->data.ptr = (void *)client;
+                    event->events = EPOLLHUP | EPOLLET;
+                    epoll_mod(loop, client->sockfd);
+
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
@@ -292,10 +337,10 @@ write_message(liby_client *client)
                     return;
                 } else {
                     if(p->handler) {
-                        p->handler(p->buf, p->offset, errno);
+                        p->handler(client, p->buf, p->offset, errno);
                     }
                     if(server->write_complete_handler) {
-                        server->write_complete_handler(p->buf, p->offset, errno);
+                        server->write_complete_handler(client, p->buf, p->offset, errno);
                     }
 
                     del_client_from_server(client, server);
@@ -305,15 +350,16 @@ write_message(liby_client *client)
             }
         }
 
-        client->curr_write_task = pop_io_task_from_client(client, false);
+        client->curr_write_task = pop_io_task_from_client(client, 0);
         free(p);
     }
 }
 
 void
-push_io_task_to_client(io_task *task, liby_client *client, int type) //type == true read type == false write
+push_io_task_to_client(io_task *task, liby_client *client, int type) //type == 1 read type == 0 write
 {
     if(task == NULL || client == NULL) {
+        printf("task or client is NULL!\n");
         return;
     }
 
@@ -332,6 +378,7 @@ void
 push_io_task(io_task **head, io_task **tail, io_task *p)
 {
     if(*head == NULL) {
+        printf("head is NULL!!!\n");
         *head = *tail = p;
         p->next = p->prev = NULL;
     } else {
@@ -359,15 +406,16 @@ pop_io_task(io_task **head, io_task **tail)
 }
 
 io_task *
-pop_io_task_from_client(liby_client *client, int type) // true for read, false for write
+pop_io_task_from_client(liby_client *client, int type) // 1 for read, 0 for write
 {
     io_task *ret = NULL;
 
-    if(task == NULL || client == NULL) {
+    if(client == NULL) {
+        printf("client is NULL!\n");
         return NULL;
     }
 
-    if(type) {
+    if(type == 1) {
         LOCK(client->io_read_mutex);
         ret = pop_io_task(&(client->read_list_head), &(client->read_list_tail));
         UNLOCK(client->io_read_mutex);
@@ -397,13 +445,21 @@ liby_async_read_some(liby_client *client, char *buf, off_t buffersize, handle_fu
     task->min_except_bytes = 0;
     task->handler = handler;
 
-    push_io_task_to_client(task, client, true);
+    push_io_task_to_client(task, client, 1);
+    printf("push one io_task!\n");
+
+    liby_server *server = client->server;
+    epoller_t *loop = server->loop;
+    struct epoll_event *event = &(loop->event);
+    event->data.ptr = (void *)client;
+    event->events = EPOLLIN | EPOLLHUP | EPOLLET;
+    epoll_mod(loop, client->sockfd);
 }
 
 void
 liby_async_read(liby_client *client, handle_func handler)
 {
-    liby_async_write_some(client, NULL, 0, handler);
+    liby_async_read_some(client, NULL, 0, handler);
 }
 
 void
@@ -419,7 +475,14 @@ liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_f
     task->min_except_bytes = 0;
     task->handler = handler;
 
-    push_io_task_to_client(task, client, true);
+    push_io_task_to_client(task, client, 0);
+
+    liby_server *server = client->server;
+    epoller_t *loop = server->loop;
+    struct epoll_event *event = &(loop->event);
+    event->data.ptr = (void *)client;
+    event->events = EPOLLOUT | EPOLLHUP | EPOLLET;
+    epoll_mod(loop, client->sockfd);
 }
 
 void
@@ -526,4 +589,10 @@ get_client_buffersize(liby_client *client)
     } else {
         return client->buffersize;
     }
+}
+
+epoll_event_handler
+get_default_epoll_handler(void)
+{
+    return handle_epoll_event;
 }

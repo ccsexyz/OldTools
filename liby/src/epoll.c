@@ -15,13 +15,16 @@ err:
 
 
 void
-run_epoll_main_loop(epoller_t *loop)
+run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler)
 {
+    loop->event_handler = handler;
+
     for(int nfds; loop->flag; ) {
         nfds = epoll_wait(loop->epfd, loop->events, loop->epollsize, -1);
         if(nfds <= 0) continue;
 
-        if(loop->event_handler) loop->event_handler(loop, nfds);
+        printf("event!\n");
+        if(handler) handler(loop, nfds);
     }
 }
 
@@ -47,7 +50,7 @@ epoller_destroy(epoller_t *loop)
 {
     if(loop == NULL) return;
 
-    if(loop->destroy_hook) destroy_hook(loop);
+    if(loop->destroy_hook) loop->destroy_hook(loop);
 
     close(loop->epfd);
     if(loop->events) free(loop->events);

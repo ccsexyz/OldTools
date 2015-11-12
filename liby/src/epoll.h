@@ -27,7 +27,7 @@ typedef struct epoller_ {
 enum { CTL_ERROR };
 
 void *safe_malloc(size_t n);
-void run_epoll_main_loop(epoller_t *loop);
+void run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler);
 
 epoller_t *epoller_init(int epollsize);
 void epoller_destroy(epoller_t *loop);

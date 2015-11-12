@@ -7,6 +7,8 @@
 
 #define DEFAULT_BUFFER_SIZE (4096)
 
+typedef struct liby_client_ liby_client;
+
 typedef void (*accept_func)(liby_client *);
 typedef void (*hook_func)(void *);
 typedef void (*handle_func)(liby_client *, char *, off_t, int);
@@ -17,6 +19,8 @@ typedef struct io_task_ {
     off_t offset;
     off_t min_except_bytes;
     handle_func handler;   //be set to NULL if it does not need any handler
+
+    struct io_task_ *next, *prev;
 } io_task;
 
 typedef struct liby_server_ {
@@ -31,7 +35,7 @@ typedef struct liby_server_ {
 
     epoller_t *loop;
 
-    handle_func acceptor;
+    accept_func acceptor;
     handle_func read_complete_handler;
     handle_func write_complete_handler;
 
@@ -67,7 +71,7 @@ void liby_server_destroy(liby_server *server);
 
 void add_server_to_epoller(liby_server *server, epoller_t *loop);
 
-void epoll_event_handler(epoller_t *loop, int n);
+void handle_epoll_event(epoller_t *loop, int n);
 
 void epoll_acceptor(liby_server *server);
 
@@ -117,4 +121,8 @@ void set_default_buffer_for_client(liby_client *client);
 char *get_client_buffer(liby_client *client);
 
 off_t get_client_buffersize(liby_client *client);
+
+epoll_event_handler get_default_epoll_handler(void);
+
+void add_client_to_epoller(liby_client *client, epoller_t *loop);
 #endif
