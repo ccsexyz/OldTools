@@ -1,3 +1,6 @@
+#ifndef LIBY_EPOLL_H
+#define LIBY_EPOLL_H
+
 #include "socket.h"
 #include <sys/epoll.h>
 #include <errno.h>
@@ -31,3 +34,6 @@ static void ctl(epoller_t *loop, int fd, int op);
 void epoll_add(epoller_t *loop, int fd);
 void epoll_mod(epoller_t *loop, int fd);
 void epoll_del(epoller_t *loop, int fd);
+
+
+#endif

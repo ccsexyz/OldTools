@@ -1,3 +1,6 @@
+#ifndef LIBY_BASE_H
+#define LIBY_BASE_H
+
 #include <pthread.h>
 
 #define author "yxx"
@@ -72,3 +75,5 @@ cond_broadcast(cond_t *c)
 {
     pthread_cond_broadcast(&(c->cond));
 }
+
+#endif
