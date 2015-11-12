@@ -59,7 +59,7 @@ initsocket(int type, const struct sockaddr *addr, socklen_t alen,
 }
 
 int
-initserver(const char *server_name, const char *bind_port)
+initserver(const char *server_path, const char *bind_port)
 {
     struct addrinfo *ailist, *aip;
     struct addrinfo hint;
@@ -69,7 +69,7 @@ initserver(const char *server_name, const char *bind_port)
     memset(&hint, 0, sizeof(hint));
     hint.ai_flags = AI_PASSIVE;
     hint.ai_socktype = SOCK_STREAM;
-    if ((err = getaddrinfo(NULL, bind_port, &hint, &ailist)) != 0) {
+    if ((err = getaddrinfo(server_path, bind_port, &hint, &ailist)) != 0) {
         printf("%s: getaddrinfo error: %s", server_name,
                gai_strerror(err));
         return -1;

@@ -26,10 +26,11 @@ run_epoll_main_loop(epoller_t *loop)
 }
 
 epoller_t *
-epoller_init(int epfd, int epollsize)
+epoller_init(int epollsize)
 {
-    if(epfd < 0) return NULL;
     if(epollsize <= 0) epollsize = 10240;
+    int epfd = epoll_create(epollsize);
+    if(epfd < 0) return NULL
 
     epoller_t *loop = safe_malloc(sizeof(epoller_t));
     memset((void *)loop, 0. sizeof(epoller_t));

@@ -4,7 +4,7 @@
 
 #define DEFAULT_BUFFER_SIZE (4096)
 
-typedef void (*accept_func)(void);
+typedef void (*accept_func)(liby_client *);
 typedef void (*hook_func)(void *);
 typedef void (*handle_func)(liby_client *, char *, off_t, int);
 
@@ -18,12 +18,9 @@ typedef struct io_task_ {
 
 typedef struct liby_server_ {
     int type;
-    char *server_name;
+    char *server_path;
     char *server_port;
     int listenfd;
-
-    off_t wsize;
-    off_t rsize;
 
     epoller_t *loop;
 
@@ -56,22 +53,22 @@ void add_server_to_epoller(liby_server *server, epoller_t *loop);
 
 
 liby_server *
-liby_server_init(const char *server_name, const char *server_port)
+liby_server_init(const char *server_path, const char *server_port)
 {
     if(server_name == NULL || server_port == NULL) {
         fprintf(stderr, "server name or port must be valid!\n");
         return NULL;
     }
 
-    char *name = strdup(server_name); //must be free
+    char *path = strdup(server_path); //must be free
     char *port = strdup(server_port);
 
     liby_server *server = safe_malloc(sizeof(liby_server));
     memset((void *)server, 0, sizeof(liby_server));
 
-    server->server_name = name;
+    server->server_path = path;
     server->server_port = port;
-    server->listenfd = initserver(name, port);
+    server->listenfd = initserver(path, port);
 
     return server;
 }
@@ -80,7 +77,7 @@ void
 liby_server_destroy(liby_server *server)
 {
     if(server) {
-        if(server->server_name) free(server->server_name);
+        if(server->server_path) free(server->server_path);
         if(server->server_port) free(server->server_port);
         close(listenfd);
 
@@ -479,6 +476,12 @@ liby_async_read_some(liby_client *client, char *buf, off_t buffersize, handle_fu
     task->handler = handler;
 
     push_io_task_to_client(task, client, true);
+}
+
+void
+liby_async_read(liby_client *client, handle_func handler)
+{
+    liby_async_write_some(client, NULL, 0, handler);
 }
 
 void
