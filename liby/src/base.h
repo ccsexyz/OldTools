@@ -10,9 +10,6 @@
 #define BROADCAST(x) do {cond_broadcast(&(x));}while(0)
 #define WAIT(x) do {cond_wait(&(x));}while(0)
 
-typedef void (*mutex_func)(mutex_t *);
-typedef void (*cond_func)(cond_t *);
-
 typedef struct {
     pthread_mutex_t mutex;
 } mutex_t;
@@ -22,58 +19,25 @@ typedef struct {
     mutex_t *m;
 } cond_t;
 
-void
-mutex_init(mutex_t *m)
-{
-    pthread_mutex_init(&(m->mutex), NULL);
-}
+typedef void (*mutex_func)(mutex_t *);
+typedef void (*cond_func)(cond_t *);
 
-void
-mutex_destroy(mutex_t *m)
-{
-    pthread_mutex_destroy(&(m->mutex));
-}
+void mutex_init(mutex_t *m);
 
-void
-mutex_lock(mutex_t *m)
-{
-    pthread_mutex_lock(&(m->mutex));
-}
+void mutex_destroy(mutex_t *m);
 
-void
-mutex_unlock(mutex_t *m)
-{
-    pthread_mutex_unlock(&(m->mutex));
-}
+void mutex_lock(mutex_t *m);
 
-void
-cond_init(cond_t *c)
-{
-    pthread_cond_init(&(c->cond), NULL);
-}
+void mutex_unlock(mutex_t *m);
 
-void
-cond_destroy(cond_t *c)
-{
-    pthread_cond_destroy(&(c->cond));
-}
+void cond_init(cond_t *c);
 
-void
-cond_signal(cond_t *c)
-{
-    pthread_cond_signal(&(c->cond));
-}
+void cond_destroy(cond_t *c);
 
-void
-cond_wait(cond_t *c)
-{
-    pthread_cond_wait(&(c->cond), c->m);
-}
+void cond_signal(cond_t *c);
 
-void
-cond_broadcast(cond_t *c)
-{
-    pthread_cond_broadcast(&(c->cond));
-}
+void cond_wait(cond_t *c);
+
+void cond_broadcast(cond_t *c);
 
 #endif

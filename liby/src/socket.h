@@ -15,6 +15,8 @@
 
 #include <errno.h>
 
+#define QLEN 10
+
 void set_noblock(int fd);
 void set_nonagle(int fd);
 int initsocket(int type, const struct sockaddr *addr, socklen_t alen, int qlen);
