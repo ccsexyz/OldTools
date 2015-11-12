@@ -5,6 +5,7 @@
 #include <sys/epoll.h>
 #include <errno.h>
 
+typedef struct epoller_ epoller_t;
 typedef void (*epoll_event_handler)(epoller_t *, int);
 typedef void (*epoll_hook)(epoller_t *);
 
@@ -28,7 +29,7 @@ enum { CTL_ERROR };
 void *safe_malloc(size_t n);
 void run_epoll_main_loop(epoller_t *loop);
 
-epoller_t *epoller_init(int epfd, int epollsize);
+epoller_t *epoller_init(int epollsize);
 void epoller_destroy(epoller_t *loop);
 static void ctl(epoller_t *loop, int fd, int op);
 void epoll_add(epoller_t *loop, int fd);

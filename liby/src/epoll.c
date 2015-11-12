@@ -30,14 +30,14 @@ epoller_init(int epollsize)
 {
     if(epollsize <= 0) epollsize = 10240;
     int epfd = epoll_create(epollsize);
-    if(epfd < 0) return NULL
+    if(epfd < 0) return NULL;
 
     epoller_t *loop = safe_malloc(sizeof(epoller_t));
-    memset((void *)loop, 0. sizeof(epoller_t));
+    memset((void *)loop, 0, sizeof(epoller_t));
     loop->events = safe_malloc(sizeof(struct epoll_event) * epollsize);
     memset((void *)(loop->events), 0, sizeof(struct epoll_event));
     loop->epfd = epfd;
-    loop->epollsize = epollsize
+    loop->epollsize = epollsize;
 
     return loop;
 }
