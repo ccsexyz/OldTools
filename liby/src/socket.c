@@ -70,7 +70,7 @@ initserver(const char *server_path, const char *bind_port)
     hint.ai_flags = AI_PASSIVE;
     hint.ai_socktype = SOCK_STREAM;
     if ((err = getaddrinfo(server_path, bind_port, &hint, &ailist)) != 0) {
-        printf("%s: getaddrinfo error: %s", server_name,
+        printf("getaddrinfo error: %s",
                gai_strerror(err));
         return -1;
     }

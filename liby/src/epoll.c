@@ -50,7 +50,7 @@ epoller_destroy(epoller_t *loop)
     if(loop->destroy_hook) destroy_hook(loop);
 
     close(loop->epfd);
-    if(events) free(events);
+    if(loop->events) free(loop->events);
 }
 
 static void
