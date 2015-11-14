@@ -45,6 +45,7 @@ typedef struct liby_server_ {
 typedef struct liby_client_ {
     int type;
     int sockfd;
+    int is_created_by_server;
 
     char *buf;
     off_t buffersize;
@@ -56,6 +57,7 @@ typedef struct liby_client_ {
     mutex_t io_write_mutex;
 
     liby_server *server;
+    epoller_t *loop;
     struct liby_client_ *next, *prev;
 } liby_client;
 
@@ -75,7 +77,7 @@ void handle_epoll_event(epoller_t *loop, int n);
 
 void epoll_acceptor(liby_server *server);
 
-liby_client *liby_client_init(int fd, liby_server *server);
+liby_client *liby_client_init_by_server(int fd, liby_server *server);
 
 void liby_client_release(liby_client *c);
 

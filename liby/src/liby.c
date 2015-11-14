@@ -129,7 +129,7 @@ epoll_acceptor(liby_server *server)
 
         set_noblock(clfd);
 
-        liby_client *client = liby_client_init(clfd, server);
+        liby_client *client = liby_client_init_by_server(clfd, server);
         add_client_to_server(client, server);
         add_client_to_epoller(client, server->loop);
 
@@ -142,10 +142,9 @@ epoll_acceptor(liby_server *server)
 }
 
 liby_client *
-liby_client_init(int fd, liby_server *server)
+liby_client_init_by_server(int fd, liby_server *server)
 {
     if(server == NULL) {
-        //
         close(fd);
         return NULL;
     }
@@ -155,8 +154,24 @@ liby_client_init(int fd, liby_server *server)
     //c->type = 0;
     c->sockfd = fd;
     c->server = server;
+    c->is_created_by_server = 1;
+    c->loop = server->loop;
 
     return c;
+}
+
+liby_client *
+liby_client_init(int fd, epoller_t *loop)
+{
+    if(loop == NULL) {
+        close(fd);
+        return NULL;
+    } else {
+        liby_client *c = (liby_client *)safe_malloc(sizeof(liby_client));
+        memset((void *)c, 0, sizeof(liby_client));
+        c->sockfd = fd;
+        c->loop = loop;
+    }
 }
 
 void
@@ -229,10 +244,11 @@ read_message(liby_client *client)
 {
     if(client == NULL) return;
     liby_server *server = client->server;
-    if(server == NULL) {
+    if(server == NULL && client->is_created_by_server) {
         liby_client_release(client);
         return;
     }
+    epoller_t *loop = client->loop;
 
     if(client->curr_read_task == NULL) {
         printf("curr_read_task = NULL!\n");
@@ -251,9 +267,6 @@ read_message(liby_client *client)
             if(ret > 0) {
                 p->offset += ret;
                 if(p->offset >= p->min_except_bytes) {
-
-                    liby_server *server = client->server;
-                    epoller_t *loop = server->loop;
                     struct epoll_event *event = &(loop->event);
                     event->data.ptr = (void *)client;
                     event->events = EPOLLHUP | EPOLLET;
@@ -262,7 +275,7 @@ read_message(liby_client *client)
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
-                    if(server->read_complete_handler) {
+                    if(server && server->read_complete_handler) {
                         server->read_complete_handler(client, p->buf, p->offset, 0);
                     }
                     break;
@@ -274,11 +287,14 @@ read_message(liby_client *client)
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, errno);
                     }
-                    if(server->read_complete_handler) {
+                    if(server && server->read_complete_handler) {
                         server->read_complete_handler(client, p->buf, p->offset, errno);
                     }
 
-                    del_client_from_server(client, server);
+                    if(client->is_created_by_server)
+                        del_client_from_server(client, server);
+                    else
+                        del_client_from_epoller(client, loop);
 
                     return;
                 }
@@ -299,6 +315,7 @@ write_message(liby_client *client)
         liby_client_release(client);
         return;
     }
+    epoller_t *loop = client->loop;
 
     if(client->curr_write_task == NULL) {
         client->curr_write_task = pop_io_task_from_client(client, 0);
@@ -316,9 +333,6 @@ write_message(liby_client *client)
             if(ret > 0) {
                 p->offset += ret;
                 if(p->offset >= p->min_except_bytes) {
-
-                    liby_server *server = client->server;
-                    epoller_t *loop = server->loop;
                     struct epoll_event *event = &(loop->event);
                     event->data.ptr = (void *)client;
                     event->events = EPOLLHUP | EPOLLET;
@@ -327,7 +341,7 @@ write_message(liby_client *client)
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
-                    if(server->write_complete_handler) {
+                    if(server && server->write_complete_handler) {
                         server->write_complete_handler(client, p->buf, p->offset, 0);
                     }
                     break;
@@ -339,11 +353,14 @@ write_message(liby_client *client)
                     if(p->handler) {
                         p->handler(client, p->buf, p->offset, errno);
                     }
-                    if(server->write_complete_handler) {
+                    if(server && server->write_complete_handler) {
                         server->write_complete_handler(client, p->buf, p->offset, errno);
                     }
 
-                    del_client_from_server(client, server);
+                    if(client->is_created_by_server)
+                        del_client_from_server(client, server);
+                    else
+                        del_client_from_epoller(client, loop);
 
                     return;
                 }
