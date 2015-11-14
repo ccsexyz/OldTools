@@ -21,6 +21,8 @@ void set_noblock(int fd);
 void set_nonagle(int fd);
 int initsocket(int type, const struct sockaddr *addr, socklen_t alen, int qlen);
 int initserver(const char *server_name, const char *bind_port);
+int connect_tcp(const char *host, const char *port);
+int connect_tcp_noblock(const char *host, const char *port); 
 
 
 #endif

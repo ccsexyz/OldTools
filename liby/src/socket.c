@@ -81,3 +81,48 @@ initserver(const char *server_path, const char *bind_port)
     }
     return -1;
 }
+
+static int
+connect_tcp_(const char *host, const char *port, int is_noblock)
+{
+    struct addrinfo hints, *res;
+    bzero((void *)(&hints), sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if(getaddrinfo(host, port, &hints, &res) == -1)
+        goto errout;
+
+    int sockfd;
+    if((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1)
+        goto errout;
+
+    if(is_noblock) {
+        set_noblock(sockfd);
+    }
+
+    int ret;
+    ret = connect(sockfd, res->ai_addr, res->ai_addrlen);
+    if(ret < 0) {
+        printf("connect error: %s\n", strerror(errno));
+        close(sockfd);
+        goto errout;
+    }
+
+    return sockfd;
+
+errout:
+    return -1;
+}
+
+int
+connect_tcp(const char *host, const char *port)
+{
+    connect_tcp_(host, port, 0);
+}
+
+int
+connect_tcp_noblock(const char *host, const char *port)
+{
+    connect_tcp_(host, port, 1);
+}
