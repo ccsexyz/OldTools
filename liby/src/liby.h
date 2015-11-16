@@ -61,7 +61,7 @@ typedef struct liby_client_ {
     struct liby_client_ *next, *prev;
 } liby_client;
 
-liby_server *liby_server_init(const char *server_name, const char *server_port);
+//liby_server *liby_server_init(const char *server_name, const char *server_port);
 
 void liby_server_destroy(liby_server *server);
 
@@ -78,6 +78,8 @@ void handle_epoll_event(epoller_t *loop, int n);
 void epoll_acceptor(liby_server *server);
 
 liby_client *liby_client_init_by_server(int fd, liby_server *server);
+
+liby_client *liby_client_init(int fd, epoller_t *loop);
 
 void liby_client_release(liby_client *c);
 
@@ -99,6 +101,10 @@ io_task *pop_io_task_from_client(liby_client *client, int type); // true for rea
 void liby_async_read_some(liby_client *client, char *buf, off_t buffersize, handle_func handler);
 
 void liby_async_read(liby_client *client, handle_func handler);
+
+//void liby_async_connect_tcp(liby_client *client, const char *host, const char *port);
+
+int liby_sync_connect_tcp(const char *host, const char *port);
 
 void liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_func handler);
 

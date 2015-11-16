@@ -157,6 +157,8 @@ liby_client_init_by_server(int fd, liby_server *server)
     c->is_created_by_server = 1;
     c->loop = server->loop;
 
+    add_client_to_epoller(c, loop);
+
     return c;
 }
 
@@ -172,6 +174,12 @@ liby_client_init(int fd, epoller_t *loop)
         c->sockfd = fd;
         c->loop = loop;
     }
+}
+
+int
+liby_sync_connect_tcp(const char *host, const char *port)
+{
+    return connect_tcp(host, port);
 }
 
 void
