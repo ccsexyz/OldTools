@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     epoller_t *loop = epoller_init(10240);
     if(loop == NULL) exit(2);
 
-    set_acceptor_for_server(echo_aceptor, echo_server);
+    set_acceptor_for_server(echo_server, echo_aceptor);
 
     add_server_to_epoller(echo_server, loop);
 

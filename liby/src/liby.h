@@ -10,6 +10,7 @@
 typedef struct liby_client_ liby_client;
 
 typedef void (*accept_func)(liby_client *);
+typedef void (*connect_func)(liby_client *);
 typedef void (*hook_func)(void *);
 typedef void (*handle_func)(liby_client *, char *, off_t, int);
 typedef void (*release_func)(void *);
@@ -62,6 +63,10 @@ typedef struct liby_client_ {
     void *data;
     release_func data_release_func;
     struct liby_client_ *next, *prev;
+
+    handle_func read_complete_handler;
+    handle_func write_complete_handler;
+    connect_func conn_func;
 } liby_client;
 
 //liby_server *liby_server_init(const char *server_name, const char *server_port);
@@ -111,11 +116,11 @@ int liby_sync_connect_tcp(const char *host, const char *port);
 
 void liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_func handler);
 
-void set_write_complete_handler_for_server(handle_func handler, liby_server *server);
+void set_write_complete_handler_for_server(liby_server *server, handle_func handler);
 
-void set_read_complete_handler_for_server(handle_func handler, liby_server *server);
+void set_read_complete_handler_for_server(liby_server *server, handle_func handler);
 
-void set_acceptor_for_server(accept_func acceptor, liby_server *server);
+void set_acceptor_for_server(liby_server *server, accept_func acceptor);
 
 void set_buffer_for_server(liby_server *server, char *buf, off_t buffersize);
 

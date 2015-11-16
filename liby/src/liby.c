@@ -518,7 +518,7 @@ liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_f
 }
 
 void
-set_write_complete_handler_for_server(handle_func handler, liby_server *server)
+set_write_complete_handler_for_server(liby_server *server, handle_func handler)
 {
     if(server != NULL) {
         server->write_complete_handler = handler;
@@ -526,7 +526,7 @@ set_write_complete_handler_for_server(handle_func handler, liby_server *server)
 }
 
 void
-set_read_complete_handler_for_server(handle_func handler, liby_server *server)
+set_read_complete_handler_for_server(liby_server *server, handle_func handler)
 {
     if(server != NULL) {
         server->read_complete_handler = handler;
@@ -534,7 +534,7 @@ set_read_complete_handler_for_server(handle_func handler, liby_server *server)
 }
 
 void
-set_acceptor_for_server(accept_func acceptor, liby_server *server)
+set_acceptor_for_server(liby_server *server, accept_func acceptor)
 {
     if(server != NULL) {
         server->acceptor = acceptor;
@@ -684,3 +684,14 @@ get_data_of_client(liby_client *client)
         return NULL;
     }
 }
+
+void
+set_connect_handler_for_client(liby_client *client, connect_func *conn_func)
+{
+    if(client) {
+        client->conn_func = conn_func;
+    }
+}
+
+void
+set_read_complete_handler_for_client(liby_client *client, handle_func)
