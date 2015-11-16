@@ -157,7 +157,7 @@ liby_client_init_by_server(int fd, liby_server *server)
     c->is_created_by_server = 1;
     c->loop = server->loop;
 
-    add_client_to_epoller(c, loop);
+    add_client_to_epoller(c, c->loop);
 
     return c;
 }
@@ -189,6 +189,7 @@ liby_client_release(liby_client *c)
         return;
     }
 
+    liby_client_release_data(c);
     close(c->sockfd);
     free(c);
 }
@@ -626,4 +627,60 @@ epoll_event_handler
 get_default_epoll_handler(void)
 {
     return handle_epoll_event;
+}
+
+void
+set_data_of_client(liby_client *client, void *data, release_func func)
+{
+    if(client) {
+        if(client->data) {
+            liby_client_release_data(client);
+        }
+
+        client->data == data;
+        client->data_release_func = func;
+    }
+}
+
+void
+liby_client_release_data(liby_client *client)
+{
+    if(client) {
+        if(client->data_release_func) {
+            client->data_release_func(client->data);
+            client->data_release_func = NULL;
+        } else {
+            free(client->data);
+        }
+
+        client->data = NULL;
+    }
+}
+
+static void
+non_free_release(void *data)
+{
+    ;
+}
+
+void
+set_data_of_client_with_free(liby_client *client, void *data)
+{
+    set_data_of_client(client, data, NULL);
+}
+
+void
+set_data_of_client_without_free(liby_client *client, void *data)
+{
+    set_data_of_client(client, data, non_free_release);
+}
+
+void *
+get_data_of_client(liby_client *client)
+{
+    if(client) {
+        return client->data;
+    } else {
+        return NULL;
+    }
 }

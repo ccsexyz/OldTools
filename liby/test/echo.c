@@ -1,4 +1,4 @@
-#include "liby/liby.h"
+#include "liby.h"
 
 void read_all_handler(liby_client *client, char *buf, off_t length, int ec);
 

@@ -12,6 +12,7 @@ typedef struct liby_client_ liby_client;
 typedef void (*accept_func)(liby_client *);
 typedef void (*hook_func)(void *);
 typedef void (*handle_func)(liby_client *, char *, off_t, int);
+typedef void (*release_func)(void *);
 
 typedef struct io_task_ {
     char *buf;
@@ -58,6 +59,8 @@ typedef struct liby_client_ {
 
     liby_server *server;
     epoller_t *loop;
+    void *data;
+    release_func data_release_func;
     struct liby_client_ *next, *prev;
 } liby_client;
 
@@ -133,4 +136,15 @@ off_t get_client_buffersize(liby_client *client);
 epoll_event_handler get_default_epoll_handler(void);
 
 void add_client_to_epoller(liby_client *client, epoller_t *loop);
+
+void set_data_of_client(liby_client *client, void *data, release_func func);
+
+void set_data_of_client_with_free(liby_client *client, void *data);
+
+void set_data_of_client_without_free(liby_client *client, void *data);
+
+void *get_data_of_client(liby_client *client);
+
+void liby_client_release_data(liby_client *client);
+
 #endif
