@@ -12,6 +12,7 @@ input_handler(liby_client *input_client, char *buf, off_t length, int ec)
         printf("sth in length = %d\n", length);
         liby_client *client =  (liby_client *)get_data_of_client(input_client);
         liby_async_write_some(client, buf, length, NULL);
+        liby_async_read(input_client, input_handler);
     }
 }
 
@@ -30,8 +31,6 @@ int main(int argc, char **argv)
     liby_client *client = liby_client_init(fd, loop);
     liby_client *input_client = liby_client_init(0, loop);
     set_data_of_client_without_free(input_client, (void *)client);
-    add_client_to_epoller(input_client, loop);
-    add_client_to_epoller(client, loop);
     liby_async_read(input_client, input_handler);
 
     run_epoll_main_loop(loop, get_default_epoll_handler());

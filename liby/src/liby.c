@@ -82,6 +82,20 @@ add_client_to_epoller(liby_client *client, epoller_t *loop)
 }
 
 void
+add_client_to_epoller1(liby_client *client, epoller_t *loop)
+{
+    if(client == NULL || loop == NULL) {
+        fprintf(stderr, "%s\n", "client or epoller must be valid!\n");
+        return;
+    }
+
+    struct epoll_event *event = &(loop->event);
+    event->data.ptr = (void *)client;
+    event->events = EPOLLOUT | EPOLLHUP | EPOLLET;
+    epoll_add(loop, client->sockfd);
+}
+
+void
 handle_epoll_event(epoller_t *loop, int n)
 {
     for(int i = 0; loop->flag && (i < n); i++) {
@@ -173,6 +187,8 @@ liby_client_init(int fd, epoller_t *loop)
         memset((void *)c, 0, sizeof(liby_client));
         c->sockfd = fd;
         c->loop = loop;
+
+        add_client_to_epoller1(c, loop);
     }
 }
 
@@ -293,6 +309,9 @@ read_message(liby_client *client)
                     if(server && server->read_complete_handler) {
                         server->read_complete_handler(client, p->buf, p->offset, 0);
                     }
+                    if(client->read_complete_handler) {
+                        client->read_complete_handler(client, p->buf, p->offset, 0);
+                    }
                     break;
                 }
             } else {
@@ -304,6 +323,9 @@ read_message(liby_client *client)
                     }
                     if(server && server->read_complete_handler) {
                         server->read_complete_handler(client, p->buf, p->offset, errno);
+                    }
+                    if(client->read_complete_handler) {
+                        client->read_complete_handler(client, p->buf, p->offset, errno);
                     }
 
                     if(client->is_created_by_server)
@@ -335,6 +357,9 @@ write_message(liby_client *client)
     if(client->curr_write_task == NULL) {
         client->curr_write_task = pop_io_task_from_client(client, 0);
         if(client->curr_write_task == NULL) {
+            if(!client->is_created_by_server && client->conn_func) {
+                client->conn_func(client);
+            }
             return;
         }
     }
@@ -359,6 +384,9 @@ write_message(liby_client *client)
                     if(server && server->write_complete_handler) {
                         server->write_complete_handler(client, p->buf, p->offset, 0);
                     }
+                    if(client->write_complete_handler) {
+                        client->write_complete_handler(client, p->buf, p->offset, 0);
+                    }
                     break;
                 }
             } else {
@@ -370,6 +398,9 @@ write_message(liby_client *client)
                     }
                     if(server && server->write_complete_handler) {
                         server->write_complete_handler(client, p->buf, p->offset, errno);
+                    }
+                    if(client->write_complete_handler) {
+                        client->write_complete_handler(client, p->buf, p->offset, errno);
                     }
 
                     if(client->is_created_by_server)
@@ -694,4 +725,17 @@ set_connect_handler_for_client(liby_client *client, connect_func *conn_func)
 }
 
 void
-set_read_complete_handler_for_client(liby_client *client, handle_func)
+set_read_complete_handler_for_client(liby_client *client, handle_func handler)
+{
+    if(client) {
+        client->read_complete_handler = handler;
+    }
+}
+
+void
+set_write_complete_handler_for_client(liby_client *client, handle_func handler)
+{
+    if(client) {
+        client->write_complete_handler = handler;
+    }
+}

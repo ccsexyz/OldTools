@@ -75,6 +75,8 @@ void liby_server_destroy(liby_server *server);
 
 void add_server_to_epoller(liby_server *server, epoller_t *loop);
 
+void add_client_to_epoller1(liby_client *client, epoller_t *loop);
+
 liby_server *liby_server_init(const char *server_path, const char *server_port);
 
 void liby_server_destroy(liby_server *server);
@@ -151,5 +153,11 @@ void set_data_of_client_without_free(liby_client *client, void *data);
 void *get_data_of_client(liby_client *client);
 
 void liby_client_release_data(liby_client *client);
+
+void set_connect_handler_for_client(liby_client *client, connect_func *conn_func);
+
+void set_read_complete_handler_for_client(liby_client *client, handle_func handler);
+
+void set_write_complete_handler_for_client(liby_client *client, handle_func handler);
 
 #endif
