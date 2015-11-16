@@ -2,10 +2,14 @@
 #define LIBY_LOG_H
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <syslog.h>
+#include <errno.h>
 
+#define MAXLINE (4096)
 
 void log_err(const char *fmt, ...);
 void log_info(const char *fmt, ...);

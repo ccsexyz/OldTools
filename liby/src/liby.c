@@ -206,6 +206,12 @@ add_client_to_server(liby_client *client, liby_server *server)
 }
 
 void
+del_client_from_epoller(liby_client *client, epoller_t *loop)
+{
+    liby_client_release(client);
+}
+
+void
 del_client_from_server(liby_client *client, liby_server *server)
 {
     if(client == NULL || server == NULL) {
