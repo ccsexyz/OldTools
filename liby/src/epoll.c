@@ -18,6 +18,7 @@ void
 run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler)
 {
     loop->event_handler = handler;
+    loop->flag = 1;
 
     for(int nfds; loop->flag; ) {
         nfds = epoll_wait(loop->epfd, loop->events, loop->epollsize, -1);

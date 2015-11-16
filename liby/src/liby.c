@@ -478,10 +478,10 @@ liby_async_read_some(liby_client *client, char *buf, off_t buffersize, handle_fu
     task->handler = handler;
 
     push_io_task_to_client(task, client, 1);
-    printf("push one io_task!\n");
+    //printf("push one io_task!\n");
 
-    liby_server *server = client->server;
-    epoller_t *loop = server->loop;
+    //liby_server *server = client->server;
+    epoller_t *loop = client->loop;
     struct epoll_event *event = &(loop->event);
     event->data.ptr = (void *)client;
     event->events = EPOLLIN | EPOLLHUP | EPOLLET;
@@ -509,8 +509,8 @@ liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_f
 
     push_io_task_to_client(task, client, 0);
 
-    liby_server *server = client->server;
-    epoller_t *loop = server->loop;
+    //liby_server *server = client->server;
+    epoller_t *loop = client->loop;
     struct epoll_event *event = &(loop->event);
     event->data.ptr = (void *)client;
     event->events = EPOLLOUT | EPOLLHUP | EPOLLET;
@@ -637,7 +637,7 @@ set_data_of_client(liby_client *client, void *data, release_func func)
             liby_client_release_data(client);
         }
 
-        client->data == data;
+        client->data = data;
         client->data_release_func = func;
     }
 }
