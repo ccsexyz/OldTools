@@ -65,6 +65,7 @@ typedef struct liby_client_ {
     release_func data_release_func;
     struct liby_client_ *next, *prev;
     struct epoll_event *event;
+    struct epoll_event event_;
 
     handle_func read_complete_handler;
     handle_func write_complete_handler;
@@ -169,5 +170,9 @@ void disable_epollin(void *client_or_server);
 void enable_epollout(void *client_or_server);
 
 void disable_epollout(void *client_or_server);
+
+static int liby_client_readable(liby_client *client);
+
+static int liby_client_writeable(liby_client *client);
 
 #endif

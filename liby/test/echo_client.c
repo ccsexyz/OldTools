@@ -3,6 +3,16 @@
 //暂时还只能用全局变量
 
 void
+output_handler(liby_client *client, char *buf, off_t length, int ec)
+{
+    if(ec) {
+        log_quit("error!");
+    } else {
+        write(1, buf, length);
+    }
+}
+
+void
 input_handler(liby_client *input_client, char *buf, off_t length, int ec)
 {
     if(ec) {
@@ -11,7 +21,7 @@ input_handler(liby_client *input_client, char *buf, off_t length, int ec)
     } else {
         printf("sth in length = %d\n", length);
         liby_client *client =  (liby_client *)get_data_of_client(input_client);
-        liby_async_write_some(client, buf, length, NULL);
+        liby_async_write_some(client, buf, length, output_handler);
         liby_async_read(input_client, input_handler);
     }
 }
@@ -19,7 +29,8 @@ input_handler(liby_client *input_client, char *buf, off_t length, int ec)
 void
 conn(liby_client *client)
 {
-    getchar();
+    //printf("connect success!\n");
+    //getchar();
 }
 
 int main(int argc, char **argv)
@@ -32,7 +43,7 @@ int main(int argc, char **argv)
     if(loop == NULL)
         log_quit("create epoller error!");
 
-    //set_noblock(0);
+    set_noblock(0);
 
     liby_client *client = liby_client_init(fd, loop);
     liby_client *input_client = liby_client_init(0, loop);

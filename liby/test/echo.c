@@ -24,6 +24,7 @@ read_all_handler(liby_client *client, char *buf, off_t length, int ec)
         del_client_from_server(client, client->server);
         return;
     } else {
+        //write(1, buf, length);
         liby_async_write_some(client, buf, length, write_all_handler);
     }
 }

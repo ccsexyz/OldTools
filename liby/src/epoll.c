@@ -24,7 +24,7 @@ run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler)
         nfds = epoll_wait(loop->epfd, loop->events, loop->epollsize, -1);
         if(nfds <= 0) continue;
 
-        printf("event!\n");
+        //printf("event!\n");
         if(handler) handler(loop, nfds);
     }
 }
