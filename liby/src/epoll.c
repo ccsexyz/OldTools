@@ -90,3 +90,37 @@ epoll_del(epoller_t *loop, int fd)
 {
     ctl(loop, fd, EPOLL_CTL_DEL);
 }
+
+static void
+ctl1(epoller_t *loop, int fd, int op, struct epoll_event *event)
+{
+    if(loop == NULL) return;
+
+    if(epoll_ctl(loop->epfd, op, fd, event) < 0) {
+        fprintf(stderr, "epoll_ctl error: %s\n", strerror(errno));
+        if(loop->error_hook) {
+            int temp = loop->error_code;
+            loop->error_code = CTL_ERROR;
+            loop->error_hook(loop);
+            loop->error_code = temp;
+        }
+    }
+}
+
+void
+epoll_mod1(epoller_t *loop, int fd, struct epoll_event *event)
+{
+    ctl1(loop, fd, EPOLL_CTL_MOD, event);
+}
+
+void
+epoll_add1(epoller_t *loop, int fd, struct epoll_event *event)
+{
+    ctl1(loop, fd, EPOLL_CTL_ADD, event);
+}
+
+void
+epoll_del1(epoller_t *loop, int fd, struct epoll_event *event)
+{
+    ctl1(loop, fd, EPOLL_CTL_DEL, event);
+}

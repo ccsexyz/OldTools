@@ -104,6 +104,7 @@ handle_epoll_event(epoller_t *loop, int n)
         liby_server *server = (liby_server *)(p->data.ptr);
 
         if(server->type) {
+            server->event = p;
             epoll_acceptor(server);
             continue;
         } else {
@@ -111,6 +112,7 @@ handle_epoll_event(epoller_t *loop, int n)
         }
 
         liby_client *client = (liby_client *)(p->data.ptr);
+        client->event = p;
         if(p->events & EPOLLHUP) {
             del_client_from_server(client, client->server);
             continue;
@@ -187,8 +189,9 @@ liby_client_init(int fd, epoller_t *loop)
         memset((void *)c, 0, sizeof(liby_client));
         c->sockfd = fd;
         c->loop = loop;
-
         add_client_to_epoller1(c, loop);
+
+        return c;
     }
 }
 
@@ -316,6 +319,7 @@ read_message(liby_client *client)
                 }
             } else {
                 if(errno == EAGAIN) {
+                    disable_epollin(client);
                     return;
                 } else {
                     if(p->handler) {
@@ -348,7 +352,7 @@ write_message(liby_client *client)
 {
     if(client == NULL) return;
     liby_server *server = client->server;
-    if(server == NULL) {
+    if(server == NULL && client->is_created_by_server) {
         liby_client_release(client);
         return;
     }
@@ -357,6 +361,7 @@ write_message(liby_client *client)
     if(client->curr_write_task == NULL) {
         client->curr_write_task = pop_io_task_from_client(client, 0);
         if(client->curr_write_task == NULL) {
+            disable_epollout(client);
             if(!client->is_created_by_server && client->conn_func) {
                 client->conn_func(client);
             }
@@ -391,6 +396,7 @@ write_message(liby_client *client)
                 }
             } else {
                 if(errno == EAGAIN) {
+                    disable_epollout(client);
                     return;
                 } else {
                     if(p->handler) {
@@ -517,6 +523,8 @@ liby_async_read_some(liby_client *client, char *buf, off_t buffersize, handle_fu
     event->data.ptr = (void *)client;
     event->events = EPOLLIN | EPOLLHUP | EPOLLET;
     epoll_mod(loop, client->sockfd);
+
+    enable_epollin(client);
 }
 
 void
@@ -546,6 +554,8 @@ liby_async_write_some(liby_client *client, char *buf, off_t buffersize, handle_f
     event->data.ptr = (void *)client;
     event->events = EPOLLOUT | EPOLLHUP | EPOLLET;
     epoll_mod(loop, client->sockfd);
+
+    enable_epollout(client);
 }
 
 void
@@ -717,7 +727,7 @@ get_data_of_client(liby_client *client)
 }
 
 void
-set_connect_handler_for_client(liby_client *client, connect_func *conn_func)
+set_connect_handler_for_client(liby_client *client, connect_func conn_func)
 {
     if(client) {
         client->conn_func = conn_func;
@@ -738,4 +748,78 @@ set_write_complete_handler_for_client(liby_client *client, handle_func handler)
     if(client) {
         client->write_complete_handler = handler;
     }
+}
+
+static void
+liby_epoll_common_func(void *client_or_server, struct epoll_event **event_, epoller_t **loop_, int *fd_)
+{
+    if(event_ && loop_ && fd_ && client_or_server) {
+        liby_server *server = (liby_server *)client_or_server;
+        if(server->type) {
+            *event_ = server->event;
+            *loop_ = server->loop;
+            *fd_ = server->listenfd;
+        } else {
+            liby_client *client = (liby_client *)client_or_server;
+            *event_ = client->event;
+            *loop_ = client->loop;
+            *fd_ = client->sockfd;
+        }
+    }
+}
+
+void
+enable_epollin(void *client_or_server)
+{
+    struct epoll_event *event;
+    epoller_t *loop;
+    int fd;
+
+    liby_epoll_common_func(client_or_server, &event, &loop, &fd);
+
+    event->events |= (EPOLLIN);
+
+    epoll_mod1(loop, fd, event);
+}
+
+void
+disable_epollin(void *client_or_server)
+{
+    struct epoll_event *event;
+    epoller_t *loop;
+    int fd;
+
+    liby_epoll_common_func(client_or_server, &event, &loop, &fd);
+
+    event->events &= ~(EPOLLIN);
+
+    epoll_mod1(loop, fd, event);
+}
+
+void
+enable_epollout(void *client_or_server)
+{
+    struct epoll_event *event;
+    epoller_t *loop;
+    int fd;
+
+    liby_epoll_common_func(client_or_server, &event, &loop, &fd);
+
+    event->events |= (EPOLLOUT);
+
+    epoll_mod1(loop, fd, event);
+}
+
+void
+disable_epollout(void *client_or_server)
+{
+    struct epoll_event *event;
+    epoller_t *loop;
+    int fd;
+
+    liby_epoll_common_func(client_or_server, &event, &loop, &fd);
+
+    event->events &= ~(EPOLLOUT);
+
+    epoll_mod1(loop, fd, event);
 }

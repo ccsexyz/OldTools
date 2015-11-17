@@ -16,6 +16,12 @@ input_handler(liby_client *input_client, char *buf, off_t length, int ec)
     }
 }
 
+void
+conn(liby_client *client)
+{
+    getchar();
+}
+
 int main(int argc, char **argv)
 {
     int fd = liby_sync_connect_tcp(argv[1], argv[2]);
@@ -32,6 +38,7 @@ int main(int argc, char **argv)
     liby_client *input_client = liby_client_init(0, loop);
     set_data_of_client_without_free(input_client, (void *)client);
     liby_async_read(input_client, input_handler);
+    set_connect_handler_for_client(client, conn);
 
     run_epoll_main_loop(loop, get_default_epoll_handler());
 

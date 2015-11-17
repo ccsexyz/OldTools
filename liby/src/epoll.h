@@ -30,11 +30,24 @@ void *safe_malloc(size_t n);
 void run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler);
 
 epoller_t *epoller_init(int epollsize);
+
 void epoller_destroy(epoller_t *loop);
+
 static void ctl(epoller_t *loop, int fd, int op);
+
 void epoll_add(epoller_t *loop, int fd);
+
 void epoll_mod(epoller_t *loop, int fd);
+
 void epoll_del(epoller_t *loop, int fd);
+
+static void ctl1(epoller_t *loop, int fd, int op, struct epoll_event *event);
+
+void epoll_mod1(epoller_t *loop, int fd, struct epoll_event *event);
+
+void epoll_add1(epoller_t *loop, int fd, struct epoll_event *event);
+
+void epoll_del1(epoller_t *loop, int fd, struct epoll_event *event);
 
 
 #endif

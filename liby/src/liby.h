@@ -36,6 +36,7 @@ typedef struct liby_server_ {
     int buf_allocate_flag;
 
     epoller_t *loop;
+    struct epoll_event *event;
 
     accept_func acceptor;
     handle_func read_complete_handler;
@@ -63,6 +64,7 @@ typedef struct liby_client_ {
     void *data;
     release_func data_release_func;
     struct liby_client_ *next, *prev;
+    struct epoll_event *event;
 
     handle_func read_complete_handler;
     handle_func write_complete_handler;
@@ -154,10 +156,18 @@ void *get_data_of_client(liby_client *client);
 
 void liby_client_release_data(liby_client *client);
 
-void set_connect_handler_for_client(liby_client *client, connect_func *conn_func);
+void set_connect_handler_for_client(liby_client *client, connect_func conn_func);
 
 void set_read_complete_handler_for_client(liby_client *client, handle_func handler);
 
 void set_write_complete_handler_for_client(liby_client *client, handle_func handler);
+
+void enable_epollin(void *client_or_server);
+
+void disable_epollin(void *client_or_server);
+
+void enable_epollout(void *client_or_server);
+
+void disable_epollout(void *client_or_server);
 
 #endif
