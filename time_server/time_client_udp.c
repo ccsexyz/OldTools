@@ -22,70 +22,70 @@ sigalrm(int signo)
 void
 print_time(int sockfd, struct addrinfo *aip)
 {
-	int		n;
-	char	buf[BUFLEN];
+    int		n;
+    char	buf[BUFLEN];
 
-	buf[0] = 0;
-	if (sendto(sockfd, buf, 1, 0, aip->ai_addr, aip->ai_addrlen) < 0) {
+    buf[0] = 0;
+    if (sendto(sockfd, buf, 1, 0, aip->ai_addr, aip->ai_addrlen) < 0) {
         fprintf(stderr, "sendto error\n");
         exit(1);
     }
-	alarm(TIMEOUT);
-	if ((n = recvfrom(sockfd, buf, BUFLEN, 0, NULL, NULL)) < 0) {
-		if (errno != EINTR)
-			alarm(0);
+    alarm(TIMEOUT);
+    if ((n = recvfrom(sockfd, buf, BUFLEN, 0, NULL, NULL)) < 0) {
+        if (errno != EINTR)
+            alarm(0);
         fprintf(stderr, "recv error\n");
         exit(1);
-	}
-	alarm(0);
+    }
+    alarm(0);
 
     time_t now;
     uint32_t t = *(uint32_t *)(buf);
     now = ntohl(t);
     now -= UNIXEPOCH;
     sprintf(buf, "%s\n", ctime(&now));
-	write(STDOUT_FILENO, buf, strlen(buf));
+    write(STDOUT_FILENO, buf, strlen(buf));
 }
 
 int
 main(int argc, char *argv[])
 {
-	struct addrinfo		*ailist, *aip;
-	struct addrinfo		hint;
-	int					sockfd, err;
-	struct sigaction	sa;
+    struct addrinfo		*ailist, *aip;
+    struct addrinfo		hint;
+    int					sockfd, err;
+    struct sigaction	sa;
 
-	if (argc != 2) {
+    if (argc != 2) {
         fprintf(stderr, "usage: ./time hostname\n");
         exit(1);
     }
-	sa.sa_handler = sigalrm;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGALRM, &sa, NULL) < 0) {
+    sa.sa_handler = sigalrm;
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGALRM, &sa, NULL) < 0) {
         fprintf(stderr, "sigaction error\n");
         exit(1);
     }
-	memset(&hint, 0, sizeof(hint));
-	hint.ai_socktype = SOCK_DGRAM;
-	hint.ai_canonname = NULL;
-	hint.ai_addr = NULL;
-	hint.ai_next = NULL;
-	if ((err = getaddrinfo(argv[1], "time", &hint, &ailist)) != 0) {
+    memset(&hint, 0, sizeof(hint));
+    hint.ai_socktype = SOCK_DGRAM;
+    hint.ai_canonname = NULL;
+    hint.ai_addr = NULL;
+    hint.ai_next = NULL;
+    if ((err = getaddrinfo(argv[1], "time", &hint, &ailist)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(err));
         exit(1);
     }
 
-	for (aip = ailist; aip != NULL; aip = aip->ai_next) {
-		if ((sockfd = socket(aip->ai_family, SOCK_DGRAM, 0)) < 0) {
-			err = errno;
-		} else {
-			print_time(sockfd, aip);
-			exit(0);
-		}
-	}
+    for (aip = ailist; aip != NULL; aip = aip->ai_next) {
+        if ((sockfd = socket(aip->ai_family, SOCK_DGRAM, 0)) < 0) {
+            err = errno;
+        } else {
+            print_time(sockfd, aip);
+            exit(0);
+        }
+    }
 
-	fprintf(stderr, "can't contact %s: %s\n", argv[1], strerror(err));
-	exit(1);
+    fprintf(stderr, "can't contact %s: %s\n", argv[1], strerror(err));
+    exit(1);
 }
 
