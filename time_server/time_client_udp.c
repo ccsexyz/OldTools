@@ -9,8 +9,8 @@
 #include <sys/socket.h>
 #include <errno.h>
 
-#define BUFLEN		128
-#define TIMEOUT		20
+#define BUFLEN      128
+#define TIMEOUT     20
 
 #define UNIXEPOCH 2208988800
 
@@ -22,8 +22,8 @@ sigalrm(int signo)
 void
 print_time(int sockfd, struct addrinfo *aip)
 {
-    int		n;
-    char	buf[BUFLEN];
+    int     n;
+    char    buf[BUFLEN];
 
     buf[0] = 0;
     if (sendto(sockfd, buf, 1, 0, aip->ai_addr, aip->ai_addrlen) < 0) {
@@ -50,10 +50,10 @@ print_time(int sockfd, struct addrinfo *aip)
 int
 main(int argc, char *argv[])
 {
-    struct addrinfo		*ailist, *aip;
-    struct addrinfo		hint;
-    int					sockfd, err;
-    struct sigaction	sa;
+    struct addrinfo     *ailist, *aip;
+    struct addrinfo     hint;
+    int                 sockfd, err;
+    struct sigaction    sa;
 
     if (argc != 2) {
         fprintf(stderr, "usage: ./time hostname\n");

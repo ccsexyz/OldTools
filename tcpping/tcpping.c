@@ -1,8 +1,8 @@
 /*************************************************************************
-	> File Name: tcpping.c
-	> Author:
-	> Mail:
-	> Created Time: 2015年09月19日 星期六 20时47分53秒
+    > File Name: tcpping.c
+    > Author:
+    > Mail:
+    > Created Time: 2015年09月19日 星期六 20时47分53秒
  ************************************************************************/
 
 #include <stdio.h>
@@ -37,8 +37,8 @@ int sleep_time = 1000; //ms, 1000 = 1s
 void
 usage(const char *name0)
 {
-	printf("usage: %s path port [sleep time(ms)]!\n", name0);
-	exit(1);
+    printf("usage: %s path port [sleep time(ms)]!\n", name0);
+    exit(1);
 }
 
 void
@@ -60,123 +60,123 @@ set_noblock(int fd)
 void
 print(void)
 {
-	char buf[300];
-	gettimeofday(&newtime, NULL);
-	time_t tv_sec;
-	suseconds_t tv_usec;
-	if(newtime.tv_usec > oldtime.tv_usec) {
-		tv_usec = newtime.tv_usec - oldtime.tv_usec;
-		tv_sec = newtime.tv_sec - oldtime.tv_sec;
-	} else {
-		tv_usec = newtime.tv_usec + 1000000L - oldtime.tv_usec;
-		tv_sec = newtime.tv_sec - oldtime.tv_sec - 1;
-	}
-	if(tv_sec == 0) {
-		sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000);
-	} else {
-		sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000 + tv_sec);
-	}
-	puts(buf);
-	usleep(1000 * sleep_time);
+    char buf[300];
+    gettimeofday(&newtime, NULL);
+    time_t tv_sec;
+    suseconds_t tv_usec;
+    if(newtime.tv_usec > oldtime.tv_usec) {
+        tv_usec = newtime.tv_usec - oldtime.tv_usec;
+        tv_sec = newtime.tv_sec - oldtime.tv_sec;
+    } else {
+        tv_usec = newtime.tv_usec + 1000000L - oldtime.tv_usec;
+        tv_sec = newtime.tv_sec - oldtime.tv_sec - 1;
+    }
+    if(tv_sec == 0) {
+        sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000);
+    } else {
+        sprintf(buf, "%s%d ms", pr_str, tv_usec / 1000 + tv_sec);
+    }
+    puts(buf);
+    usleep(1000 * sleep_time);
 }
 
 int
 nonb_connect(int fd)
 {
-	gettimeofday(&oldtime, NULL);
-	int n = connect(fd, res->ai_addr, res->ai_addrlen);
-	if(n < 0) {
-		if(errno != EINPROGRESS) {
-			fprintf(stderr, "connect error: %s\n", strerror(errno));
-			exit(1);
-		}
-		return 0;
-	} else {
-		print();
-		return 1;
-	}
+    gettimeofday(&oldtime, NULL);
+    int n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if(n < 0) {
+        if(errno != EINPROGRESS) {
+            fprintf(stderr, "connect error: %s\n", strerror(errno));
+            exit(1);
+        }
+        return 0;
+    } else {
+        print();
+        return 1;
+    }
 }
 
 #if defined(__linux__) || defined (__linux)
 void
 do_epoll()
 {
-	int epfd = epoll_create(1024);
-	struct epoll_event events[20];
+    int epfd = epoll_create(1024);
+    struct epoll_event events[20];
 
-	while(1) {
-		int sockfd;
-		if((sockfd = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) == -1) {
-	        fprintf(stderr, "socket error: %s\n", strerror(errno));
-	        return;
-	    }
-		set_noblock(sockfd);
-		struct epoll_event ev;
-		ev.data.fd = sockfd;
-		ev.events = EPOLLIN | EPOLLET | EPOLLOUT;
-		epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
-		int ret = nonb_connect(sockfd);
-		if(ret)
-			goto gogogo;
-		int nfds = epoll_wait(epfd, events, 20, -1);
-		if(events[0].data.fd == sockfd) {
-			print();
-		}
+    while(1) {
+        int sockfd;
+        if((sockfd = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) == -1) {
+            fprintf(stderr, "socket error: %s\n", strerror(errno));
+            return;
+        }
+        set_noblock(sockfd);
+        struct epoll_event ev;
+        ev.data.fd = sockfd;
+        ev.events = EPOLLIN | EPOLLET | EPOLLOUT;
+        epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev);
+        int ret = nonb_connect(sockfd);
+        if(ret)
+            goto gogogo;
+        int nfds = epoll_wait(epfd, events, 20, -1);
+        if(events[0].data.fd == sockfd) {
+            print();
+        }
 gogogo:
-		close(sockfd);
-		epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, NULL);
-	}
+        close(sockfd);
+        epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, NULL);
+    }
 }
 #elif defined(__APPLE__) && defined (__MACH__)
 void
 do_kqueue()
 {
-	int kq = kqueue();
-	if(kq == -1) {
-		perror("create kq error!");
-		exit(1);
-	}
+    int kq = kqueue();
+    if(kq == -1) {
+        perror("create kq error!");
+        exit(1);
+    }
 
-	while(1) {
-		int sockfd;
-		if((sockfd = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) == -1) {
-	        fprintf(stderr, "socket error: %s\n", strerror(errno));
-	        return;
-	    }
-		set_noblock(sockfd);
-		struct kevent changes[1];
-		EV_SET(&changes[0], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-		kevent(kq, changes, 1, NULL, 0, NULL);
-		int ret = nonb_connect(sockfd);
-		if(ret)
-			goto gogogo;
-		struct kevent events[10];
-		struct timespec timeout = {3, 0};
-		int r = kevent(kq, NULL, 0, events, 10, &timeout);
-		if(r == 0) {
-			printf("timeout !\n");
-		} else {
-			print();
-		}
+    while(1) {
+        int sockfd;
+        if((sockfd = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) == -1) {
+            fprintf(stderr, "socket error: %s\n", strerror(errno));
+            return;
+        }
+        set_noblock(sockfd);
+        struct kevent changes[1];
+        EV_SET(&changes[0], sockfd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+        kevent(kq, changes, 1, NULL, 0, NULL);
+        int ret = nonb_connect(sockfd);
+        if(ret)
+            goto gogogo;
+        struct kevent events[10];
+        struct timespec timeout = {3, 0};
+        int r = kevent(kq, NULL, 0, events, 10, &timeout);
+        if(r == 0) {
+            printf("timeout !\n");
+        } else {
+            print();
+        }
 gogogo:
-		close(sockfd);
-	}
+        close(sockfd);
+    }
 }
 #endif
 
 int main(int argc, char **argv)
 {
-	if(argc != 3 && argc != 4)
-		usage(argv[0]);
+    if(argc != 3 && argc != 4)
+        usage(argv[0]);
 
-	char *path = argv[1];
-	char *port = argv[2];
+    char *path = argv[1];
+    char *port = argv[2];
     if(argc == 4) {
         int sleep_time0 = atoi(argv[3]);
         if(sleep_time0 >= 0)
             sleep_time = sleep_time0;
     }
-	memset(&hints, 0, sizeof(hints));
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     if(getaddrinfo(path, port, &hints, &res) == -1) {
@@ -185,10 +185,10 @@ int main(int argc, char **argv)
     }
 
     sprintf(pr_str, "TCPPING %s:%s -- ", path, port);
-	#if defined(__linux__) || defined (__linux)
-	do_epoll();
-	#elif defined(__APPLE__) && defined (__MACH__)
-	do_kqueue();
-	#endif
+    #if defined(__linux__) || defined (__linux)
+    do_epoll();
+    #elif defined(__APPLE__) && defined (__MACH__)
+    do_kqueue();
+    #endif
 
 }

@@ -10,9 +10,9 @@
 #include <sys/socket.h>
 #include <errno.h>
 
-#define BUFLEN		128
-#define TIMEOUT		20
-#define MAXADDRLEN	256
+#define BUFLEN      128
+#define TIMEOUT     20
+#define MAXADDRLEN  256
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
@@ -49,12 +49,12 @@ errout:
 void
 serve(int sockfd)
 {
-    int				n;
-    socklen_t		alen;
-    FILE			*fp;
-    char			buf[BUFLEN];
-    char			abuf[MAXADDRLEN];
-    struct sockaddr	*addr = (struct sockaddr *)abuf;
+    int             n;
+    socklen_t       alen;
+    FILE            *fp;
+    char            buf[BUFLEN];
+    char            abuf[MAXADDRLEN];
+    struct sockaddr *addr = (struct sockaddr *)abuf;
 
     for (;;) {
         alen = MAXADDRLEN;
@@ -87,15 +87,15 @@ err_sys(const char *str)
 int
 main(int argc, char *argv[])
 {
-    struct addrinfo	*ailist, *aip;
-    struct addrinfo	hint;
-    int				sockfd, err, n;
-    char			*host;
+    struct addrinfo *ailist, *aip;
+    struct addrinfo hint;
+    int             sockfd, err, n;
+    char            *host;
 
     if (argc != 1)
         err_quit("usage: timed");
     if ((n = sysconf(_SC_HOST_NAME_MAX)) < 0)
-        n = HOST_NAME_MAX;	/* best guess */
+        n = HOST_NAME_MAX;  /* best guess */
     if ((host = malloc(n)) == NULL)
         err_sys("malloc error");
     if (gethostname(host, n) < 0)
