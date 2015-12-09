@@ -865,3 +865,9 @@ disable_epollout(void *client_or_server)
 
     epoll_mod1(loop, fd, event);
 }
+
+liby_client *
+get_clients_of_server(liby_server *server)
+{
+    return server->head;
+}

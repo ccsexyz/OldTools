@@ -175,4 +175,6 @@ static int liby_client_readable(liby_client *client);
 
 static int liby_client_writeable(liby_client *client);
 
+liby_client *get_clients_of_server(liby_server *server);
+
 #endif
