@@ -871,3 +871,26 @@ get_clients_of_server(liby_server *server)
 {
     return server->head;
 }
+
+/*
+void
+set_private_data_of_client(liby_client *client, void *data, size_t datasize)
+{
+    if(client == NULL || data == NULL || datasize == 0) return;
+    client->data = data;
+    client->datasize;
+}
+
+void *
+get_private_data_of_client(liby_client *client)
+{
+    if(client == NULL) return NULL;
+    return client->data;
+}
+
+size_t
+get_private_datasize_of_client(liby_client *client)
+{
+    if(client == NULL) return 0;
+    return client->datasize;
+}*/

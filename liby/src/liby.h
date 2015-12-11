@@ -70,6 +70,10 @@ typedef struct liby_client_ {
     handle_func read_complete_handler;
     handle_func write_complete_handler;
     connect_func conn_func;
+
+    /*
+    void *data;
+    size_t datasize;*/
 } liby_client;
 
 //liby_server *liby_server_init(const char *server_name, const char *server_port);
@@ -176,5 +180,11 @@ static int liby_client_readable(liby_client *client);
 static int liby_client_writeable(liby_client *client);
 
 liby_client *get_clients_of_server(liby_server *server);
+/*
+void set_private_data_of_client(liby_client *client, void *data, size_t datasize);
+
+void *get_private_data_of_client(liby_client *client);
+
+size_t get_private_datasize_of_client(liby_client *client);*/
 
 #endif
