@@ -40,4 +40,12 @@ void cond_wait(cond_t *c);
 
 void cond_broadcast(cond_t *c);
 
+char **liby_split1(char *src, const char *sp);
+
+char **liby_split(const char *src, const char *sp);
+
+char **liby_split_free(char **p);
+
+char **liby_split_print(char **p);
+
 #endif
