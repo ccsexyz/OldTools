@@ -36,6 +36,7 @@ void Connection::read_error(int err)
 {
     if(current_read_task) {
         (*current_read_task)(err);
+        current_read_task.reset();
     }while(!read_queue.empty()) {
         auto x = read_queue.front();
         (*x)(err);
@@ -47,6 +48,7 @@ void Connection::write_error(int err)
 {
     if(current_write_task) {
         (*current_write_task)(err);
+        current_write_task.reset();
     }
     while(!write_queue.empty()) {
         auto x = write_queue.front();
