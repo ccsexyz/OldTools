@@ -2,52 +2,45 @@
 #define LIBY_EPOLL_H
 
 #include "socket.h"
-#include <sys/epoll.h>
 #include <errno.h>
+#include <sys/epoll.h>
 
 typedef struct epoller_ epoller_t;
-typedef void (*epoll_event_handler)(epoller_t *, int);
-typedef void (*epoll_hook)(epoller_t *);
+typedef struct chan_ chan;
+typedef void (*epoll_event_handler)(chan *c);
+
+typedef struct chan_ {
+    void *p;
+    int fd;
+    struct epoll_event *event;
+    epoll_event_handler event_handler;
+} chan;
 
 typedef struct epoller_ {
     int epfd;
     int epollsize;
     int flag;
     int error_code;
-    int running_servers;
-
-    epoll_event_handler event_handler;
-    epoll_hook error_hook;
-    epoll_hook destroy_hook;
 
     struct epoll_event *events;
-    struct epoll_event event;
 } epoller_t;
 
 enum { CTL_ERROR };
 
-void *safe_malloc(size_t n);
-void run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler);
+void run_epoll_main_loop(epoller_t *epoller);
 
 epoller_t *epoller_init(int epollsize);
 
-void epoller_destroy(epoller_t *loop);
+void epoller_destroy(epoller_t *epoller);
 
-static void ctl(epoller_t *loop, int fd, int op);
+void add_chan_to_epoller(epoller_t *epoller, chan *ch);
 
-void epoll_add(epoller_t *loop, int fd);
+void remove_chan_from_epoller(epoller_t *epoller, chan *ch);
 
-void epoll_mod(epoller_t *loop, int fd);
+void mod_chan_of_epoller(epoller_t *epoller, chan *ch);
 
-void epoll_del(epoller_t *loop, int fd);
+chan *make_chan(void *p, int fd, struct epoll_event *event, epoll_event_handler event_handler);
 
-static void ctl1(epoller_t *loop, int fd, int op, struct epoll_event *event);
-
-void epoll_mod1(epoller_t *loop, int fd, struct epoll_event *event);
-
-void epoll_add1(epoller_t *loop, int fd, struct epoll_event *event);
-
-void epoll_del1(epoller_t *loop, int fd, struct epoll_event *event);
-
+void destroy_chan(chan *ch);
 
 #endif

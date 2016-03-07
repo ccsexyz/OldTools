@@ -1,126 +1,105 @@
 #include "epoll.h"
+#include "log.h"
+#include "base.h"
 
-void *
-safe_malloc(size_t n)
-{
-    if(n < 0)
-        goto err;
-    void *p = malloc(n);
-    if(p != NULL)
-        return p;
-err:
-    puts("malloc error!\n");
-    exit(1);
-}
+static int i = 1;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static void ctl(epoller_t *epoller, int fd, int op, struct epoll_event *event) {
+    assert(epoller && fd >= 0);
 
-void
-run_epoll_main_loop(epoller_t *loop, epoll_event_handler handler)
-{
-    loop->event_handler = handler;
-    loop->flag = 1;
-
-    for(int nfds; loop->flag; ) {
-        nfds = epoll_wait(loop->epfd, loop->events, loop->epollsize, -1);
-        if(nfds <= 0) continue;
-
-        //printf("event!\n");
-        if(handler) handler(loop, nfds);
+    if (epoll_ctl(epoller->epfd, op, fd, event) < 0) {
+        log_err("epoll_ctl error: %s\n", strerror(errno));
     }
 }
 
-epoller_t *
-epoller_init(int epollsize)
-{
-    if(epollsize <= 0) epollsize = 10240;
+static void epoll_mod(epoller_t *epoller, int fd, struct epoll_event *event) {
+    ctl(epoller, fd, EPOLL_CTL_MOD, event);
+}
+
+static void epoll_add(epoller_t *epoller, int fd, struct epoll_event *event) {
+    ctl(epoller, fd, EPOLL_CTL_ADD, event);
+}
+
+static void epoll_del(epoller_t *epoller, int fd, struct epoll_event *event) {
+    ctl(epoller, fd, EPOLL_CTL_DEL, event);
+}
+
+void run_epoll_main_loop(epoller_t *epoller) {
+    epoller->flag = 1;
+
+    for (int nfds; epoller->flag;) {
+        nfds = epoll_wait(epoller->epfd, epoller->events, epoller->epollsize, -1);
+        if (nfds == 0)
+            continue;
+        if(nfds < 0 && errno != EINTR)
+            log_quit("epoll_wait: %s", strerror(errno));
+
+        for(int i = 0; i < nfds; i++) {
+            chan *ch = (chan *)epoller->events[i].data.ptr;
+            assert(ch);
+            *(ch->event) = epoller->events[i];
+            ch->event_handler(ch);
+        }
+    }
+}
+
+epoller_t *epoller_init(int epollsize) {
+    if (epollsize <= 0)
+        epollsize = 10240;
     int epfd = epoll_create(epollsize);
-    if(epfd < 0) return NULL;
+    if (epfd < 0)
+        return NULL;
 
-    epoller_t *loop = safe_malloc(sizeof(epoller_t));
-    memset((void *)loop, 0, sizeof(epoller_t));
-    loop->events = safe_malloc(sizeof(struct epoll_event) * epollsize);
-    memset((void *)(loop->events), 0, sizeof(struct epoll_event));
-    loop->epfd = epfd;
-    loop->epollsize = epollsize;
+    epoller_t *epoller = safe_malloc(sizeof(epoller_t));
+    memset((void *)epoller, 0, sizeof(epoller_t));
+    epoller->events = safe_malloc(sizeof(struct epoll_event) * epollsize);
+    memset((void *)(epoller->events), 0, sizeof(struct epoll_event) * epollsize);
+    epoller->epfd = epfd;
+    epoller->epollsize = epollsize;
 
-    return loop;
+    return epoller;
 }
 
-void
-epoller_destroy(epoller_t *loop)
-{
-    if(loop == NULL) return;
-
-    if(loop->destroy_hook) loop->destroy_hook(loop);
-
-    close(loop->epfd);
-    if(loop->events) free(loop->events);
+void epoller_destroy(epoller_t *epoller) {
+    assert(epoller && epoller->epfd >= 0 && epoller->events);
+    close(epoller->epfd);
+    free(epoller->events);
+    free(epoller);
 }
 
-static void
-ctl(epoller_t *loop, int fd, int op)
-{
-    if(loop == NULL) return;
-
-    if(epoll_ctl(loop->epfd, op, fd, &(loop->event)) < 0) {
-        fprintf(stderr, "epoll_ctl error: %s\n", strerror(errno));
-        if(loop->error_hook) {
-            int temp = loop->error_code;
-            loop->error_code = CTL_ERROR;
-            loop->error_hook(loop);
-            loop->error_code = temp;
-        }
-    }
+void add_chan_to_epoller(epoller_t *epoller, chan *ch) {
+    assert(epoller && ch && ch->fd >= 0 && ch->p && ch->event && ch->event_handler);
+    //pthread_mutex_lock(&mutex);
+    epoll_add(epoller, ch->fd, ch->event);
+    //pthread_mutex_unlock(&mutex);
 }
 
-void
-epoll_add(epoller_t *loop, int fd)
-{
-    ctl(loop, fd, EPOLL_CTL_ADD);
+void remove_chan_from_epoller(epoller_t *epoller, chan *ch) {
+    assert(epoller && ch && ch->fd >= 0);
+    epoll_del(epoller, ch->fd, ch->event);
+    //pthread_mutex_lock(&mutex);
+    //pthread_mutex_unlock(&mutex);
 }
 
-void
-epoll_mod(epoller_t *loop, int fd)
-{
-    ctl(loop, fd, EPOLL_CTL_MOD);
+void mod_chan_of_epoller(epoller_t *epoller, chan *ch) {
+    assert(epoller && ch && ch->fd >= 0 && ch->event);
+    //pthread_mutex_lock(&mutex);
+    epoll_mod(epoller, ch->fd, ch->event);
+    //pthread_mutex_unlock(&mutex);
 }
 
-void
-epoll_del(epoller_t *loop, int fd)
-{
-    ctl(loop, fd, EPOLL_CTL_DEL);
+chan *make_chan(void *p, int fd, struct epoll_event *event, epoll_event_handler event_handler) {
+    ALLOC(chan, ret);
+    ret->p = p;
+    ret->fd = fd;
+    ret->event = event;
+    ret->event_handler = event_handler;
+    return ret;
 }
 
-static void
-ctl1(epoller_t *loop, int fd, int op, struct epoll_event *event)
-{
-    if(loop == NULL) return;
-
-    if(epoll_ctl(loop->epfd, op, fd, event) < 0) {
-        fprintf(stderr, "epoll_ctl error: %s\n", strerror(errno));
-        if(loop->error_hook) {
-            int temp = loop->error_code;
-            loop->error_code = CTL_ERROR;
-            loop->error_hook(loop);
-            loop->error_code = temp;
-        }
-    }
-}
-
-void
-epoll_mod1(epoller_t *loop, int fd, struct epoll_event *event)
-{
-    ctl1(loop, fd, EPOLL_CTL_MOD, event);
-}
-
-void
-epoll_add1(epoller_t *loop, int fd, struct epoll_event *event)
-{
-    ctl1(loop, fd, EPOLL_CTL_ADD, event);
-}
-
-void
-epoll_del1(epoller_t *loop, int fd, struct epoll_event *event)
-{
-    ctl1(loop, fd, EPOLL_CTL_DEL, event);
+void destroy_chan(chan *ch) {
+    assert(ch && ch->fd >= 0);
+    close(ch->fd);
+    free(ch);
 }
