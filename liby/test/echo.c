@@ -14,7 +14,7 @@ void write_all_handler(liby_client *client, char *buf, off_t length, int ec) {
 
 void read_all_handler(liby_client *client, char *buf, off_t length, int ec) {
     if (ec != 0) {
-        log_err("error");
+        //log_err("error");
         return;
     } else {
         // write(1, buf, length);
@@ -29,7 +29,7 @@ void echo_aceptor(liby_client *client) {
 }
 
 int main(int argc, char **argv) {
-    liby_server *echo_server = liby_server_init("localhost", "9377", echo_aceptor);
+    liby_server *echo_server = liby_server_init("0.0.0.0", "9377", echo_aceptor);
     liby_loop *loop = liby_create_easy();
     //liby_loop *loop = liby_loop_create(1);
     add_server_to_loop(echo_server, loop);

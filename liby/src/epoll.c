@@ -9,7 +9,7 @@ static void ctl(epoller_t *epoller, int fd, int op, struct epoll_event *event) {
     assert(epoller && fd >= 0);
 
     if (epoll_ctl(epoller->epfd, op, fd, event) < 0) {
-        log_err("epoll_ctl error: %s\n", strerror(errno));
+        log_err("epoll_ctl error: %s with fd %d", strerror(errno), fd);
     }
 }
 
@@ -30,6 +30,7 @@ void run_epoll_main_loop(epoller_t *epoller) {
 
     for (int nfds; epoller->flag;) {
         nfds = epoll_wait(epoller->epfd, epoller->events, epoller->epollsize, -1);
+        log_info("event from thread %llx!", pthread_self());
         if (nfds == 0)
             continue;
         if(nfds < 0 && errno != EINTR)
@@ -38,7 +39,8 @@ void run_epoll_main_loop(epoller_t *epoller) {
         for(int i = 0; i < nfds; i++) {
             chan *ch = (chan *)epoller->events[i].data.ptr;
             assert(ch);
-            *(ch->event) = epoller->events[i];
+            //*(ch->event) = epoller->events[i];
+            ch->catched_event = &(epoller->events[i]);
             ch->event_handler(ch);
         }
     }
@@ -94,12 +96,14 @@ chan *make_chan(void *p, int fd, struct epoll_event *event, epoll_event_handler 
     ret->p = p;
     ret->fd = fd;
     ret->event = event;
+    ret->catched_event = NULL;
     ret->event_handler = event_handler;
     return ret;
 }
 
 void destroy_chan(chan *ch) {
     assert(ch && ch->fd >= 0);
-    close(ch->fd);
+    int ret = close(ch->fd);
+    if(ret < 0) log_err("close");
     free(ch);
 }

@@ -54,7 +54,7 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     auto loop = make_shared<EventLoop>();
-    HelloServer h(loop, "localhost", "9377");
+    //HelloServer h(loop, "localhost", "9377");
     EchoServer e(loop, "localhost", "9999");
     loop->main_loop();
     return 0;

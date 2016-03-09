@@ -3,6 +3,7 @@
 
 #include "base.h"
 #include "epoll.h"
+#include "log.h"
 
 #define DEFAULT_BUFFER_SIZE (4096)
 
@@ -25,6 +26,7 @@ typedef struct io_task_ {
 } io_task;
 
 typedef struct liby_client_ {
+    int destroy;
     int sockfd;
     epoller_t *epoller;
     chan *ch;
@@ -116,15 +118,25 @@ void enable_write(liby_client *client);
 
 void disable_write(liby_client *client);
 
-int get_servers_of_loop(liby_loop *loop, liby_server **p);
+int get_servers_of_loop(liby_loop *loop, liby_server ***p);
 
-int get_clients_of_loop(liby_loop *loop, liby_client **p);
+int get_clients_of_loop(liby_loop *loop, liby_client ***p);
 
-int get_clients_of_server(liby_server *server, liby_client **p);
+int get_clients_of_server(liby_server *server, liby_client ***p);
 
 void set_connect_handler_for_client(liby_client *client,
                                     connect_func conn_func);
 
 void set_acceptor_for_server(liby_server *server, accept_func acceptor);
+
+void liby_client_set_data(liby_client *client, void *data, release_func func);
+
+void liby_client_set_data_with_free(liby_client *client, void *data);
+
+void liby_client_set_data_without_free(liby_client *client, void *data);
+
+void *liby_client_get_data(liby_client *client);
+
+void liby_destroy_client_later(liby_client *client);
 
 #endif

@@ -13,6 +13,7 @@ typedef struct chan_ {
     void *p;
     int fd;
     struct epoll_event *event;
+    struct epoll_event *catched_event;
     epoll_event_handler event_handler;
 } chan;
 

@@ -11,6 +11,7 @@ static void push_read_task_to_client(io_task *task, liby_client *client);
 static io_task *pop_read_task_from_client(liby_client *client);
 static void push_write_task_to_client(io_task *task, liby_client *client);
 static io_task *pop_write_task_from_client(liby_client *client);
+static void liby_client_update_state(liby_client *client);
 
 static void *busy_worker(void *p) {
     assert(p);
@@ -91,8 +92,8 @@ liby_client *liby_client_init(int clfd, liby_loop *loop) {
     BZERO(client);
 
     struct epoll_event *event = &(client->event);
-    //event->data.fd = clfd;
-    event->events = EPOLLIN | EPOLLHUP | EPOLLET;
+    // event->data.fd = clfd;
+    event->events = EPOLLIN | EPOLLHUP | EPOLLET | EPOLLRDHUP;
     client->ch = make_chan((void *)client, clfd, event, liby_client_handler);
     event->data.ptr = (void *)(client->ch);
 
@@ -114,37 +115,38 @@ liby_client *liby_client_init(int clfd, liby_loop *loop) {
     return client;
 }
 
-
 void liby_client_destroy(liby_client *client) {
     assert(client);
 
     if (client->server) {
         remove_client_from_server(client);
-    } else if(client->loop){
+    } else if (client->loop) {
         remove_client_from_loop(client);
     }
 
-    if(client->curr_read_task) io_task_destroy(client->curr_read_task);
-    if(client->curr_write_task) io_task_destroy(client->curr_write_task);
+    if (client->curr_read_task)
+        io_task_destroy(client->curr_read_task);
+    if (client->curr_write_task)
+        io_task_destroy(client->curr_write_task);
 
-    if(!list_empty(&(client->read_list_head.list))) {
+    if (!list_empty(&(client->read_list_head.list))) {
         struct list_head *pos = NULL;
         io_task *task = NULL;
         list_for_each(pos, &(client->read_list_head.list)) {
             task = list_entry(pos, io_task, list);
-            if(task && task->handler) {
+            if (task && task->handler) {
                 task->handler(client, task->buf, 0, -1);
                 io_task_destroy(task);
             }
         }
     }
 
-    if(!list_empty(&(client->write_list_head.list))) {
+    if (!list_empty(&(client->write_list_head.list))) {
         struct list_head *pos = NULL;
         io_task *task = NULL;
         list_for_each(pos, &(client->write_list_head.list)) {
             task = list_entry(pos, io_task, list);
-            if(task && task->handler) {
+            if (task && task->handler) {
                 task->handler(client, task->buf, 0, -1);
                 io_task_destroy(task);
             }
@@ -181,7 +183,8 @@ liby_server *liby_server_init(const char *server_path, const char *server_port,
     set_noblock(server->listenfd);
     INIT_LIST_HEAD(&(server->clients.list));
     mutex_init(&(server->clients_mutex));
-    server->ch = make_chan((void *)server, server->listenfd, &(server->event), liby_server_acceptor);
+    server->ch = make_chan((void *)server, server->listenfd, &(server->event),
+                           liby_server_acceptor);
 
     return server;
 }
@@ -227,7 +230,7 @@ void remove_server_from_loop(liby_server *server) {
     mutex_lock(&(loop->servers_mutex));
     list_del(&(server->list));
     mutex_unlock(&(loop->servers_mutex));
-    //remove_chan_from_epoller(server->epoller, server->listenfd);
+    // remove_chan_from_epoller(server->epoller, server->listenfd);
 }
 
 void remove_client_from_loop(liby_client *client) {
@@ -236,7 +239,7 @@ void remove_client_from_loop(liby_client *client) {
     mutex_lock(&(loop->clients_mutex));
     list_del(&(client->list));
     mutex_unlock(&(loop->clients_mutex));
-    //remove_chan_from_epoller(client->epoller, client->sockfd);
+    // remove_chan_from_epoller(client->epoller, client->sockfd);
 }
 
 void remove_client_from_server(liby_client *client) {
@@ -245,10 +248,9 @@ void remove_client_from_server(liby_client *client) {
     mutex_lock(&(server->clients_mutex));
     list_del(&(client->list));
     mutex_unlock(&(server->clients_mutex));
-    //remove_chan_from_epoller(client->epoller, client->sockfd);
-    //liby_client_destroy(client);
+    // remove_chan_from_epoller(client->epoller, client->sockfd);
+    // liby_client_destroy(client);
 }
-
 
 void liby_client_release_data(liby_client *client) {
     if (client) {
@@ -269,7 +271,7 @@ static void liby_server_acceptor(chan *c) {
     liby_loop *loop = server->loop;
     int listenfd = server->listenfd;
 
-    if (c->event->events & EPOLLERR) {
+    if (c->catched_event->events & EPOLLERR) {
         log_err("server error!\n");
         remove_server_from_loop(server);
         return;
@@ -298,18 +300,20 @@ static void liby_server_acceptor(chan *c) {
 }
 
 static void liby_client_handler(chan *c) {
-    assert(c && c->p && c->event);
-    //printf("handler was called!\n");
+    assert(c && c->p && c->event && c->catched_event);
+    // printf("handler was called!\n");
     liby_client *client = (liby_client *)(c->p);
     liby_server *server = client->server;
     liby_loop *loop = client->loop;
 
-    if (c->event->events & EPOLLHUP || c->event->events & EPOLLERR ||
-        c->event->events & EPOLLHUP) {
+    if (c->catched_event->events & EPOLLHUP ||
+        c->catched_event->events & EPOLLERR ||
+        c->catched_event->events & EPOLLRDHUP) {
         liby_client_destroy(client);
-    } else if (c->event->events & EPOLLIN) {
+        return;
+    } else if (c->catched_event->events & EPOLLIN) {
         read_message(client);
-    } else if (c->event->events & EPOLLOUT) {
+    } else if (c->catched_event->events & EPOLLOUT) {
         write_message(client);
     }
 }
@@ -341,36 +345,40 @@ static void read_message(liby_client *client) {
             int ret =
                 read(client->sockfd, p->buf + p->offset, p->size - p->offset);
             if (ret > 0) {
+                log_info("ret in write_message = %u", ret);
                 p->offset += ret;
                 if (p->offset >= p->min_except_bytes) {
                     if (p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
                     break;
+                } else {
+                    log_info("offset = %u min_except_bytes = %u", p->offset,
+                             p->min_except_bytes);
                 }
             } else {
                 if (ret != 0 && errno == EAGAIN) {
-                    if (!liby_client_readable(client)) {
-                        disable_read(client);
-                    }
+                    goto out;
                 } else {
                     int ec = errno;
-                    if(ec == 0 && ret == 0) ec = -1;
+                    if (ec == 0 && ret == 0)
+                        ec = -1;
                     if (p->handler) {
+                        disable_read(client);
                         p->handler(client, p->buf, p->offset, ec);
                     }
 
                     liby_client_destroy(client);
+                    return;
                 }
-
-                return;
             }
         }
 
         client->curr_read_task = pop_read_task_from_client(client);
         io_task_destroy(p);
     }
-    disable_read(client);
+out:
+    liby_client_update_state(client);
 }
 
 static void write_message(liby_client *client) {
@@ -392,36 +400,39 @@ static void write_message(liby_client *client) {
             int ret =
                 write(client->sockfd, p->buf + p->offset, p->size - p->offset);
             if (ret > 0) {
+                log_info("ret in write_message = %u", ret);
                 p->offset += ret;
                 if (p->offset >= p->min_except_bytes) {
                     if (p->handler) {
                         p->handler(client, p->buf, p->offset, 0);
                     }
                     break;
+                } else {
+                    log_info("offset = %u min_except_bytes = %u", p->offset,
+                             p->min_except_bytes);
                 }
             } else {
                 if (ret != 0 && errno == EAGAIN) {
-                    if (!liby_client_writeable(client)) {
-                        disable_write(client);
-                    }
+                    goto out;
                 } else {
                     int ec = errno;
-                    if(ec == 0 && ret == 0) ec = -1;
+                    if (ec == 0 && ret == 0)
+                        ec = -1;
                     if (p->handler) {
                         p->handler(client, p->buf, p->offset, ec);
                     }
 
                     liby_client_destroy(client);
+                    return;
                 }
-
-                return;
             }
         }
 
         client->curr_write_task = pop_write_task_from_client(client);
         io_task_destroy(p);
     }
-    disable_write(client);
+out:
+    liby_client_update_state(client);
 }
 
 static void push_read_task_to_client(io_task *task, liby_client *client) {
@@ -499,7 +510,7 @@ void liby_async_write_some(liby_client *client, char *buf, off_t buffersize,
     task->buf = buf;
     task->size = buffersize;
     task->offset = 0;
-    task->min_except_bytes;
+    task->min_except_bytes = 0;
     task->handler = handler;
 
     push_write_task_to_client(task, client);
@@ -508,7 +519,7 @@ void liby_async_write_some(liby_client *client, char *buf, off_t buffersize,
 
 void io_task_destroy(io_task *p) {
     assert(p);
-    //free(p->buf);
+    // free(p->buf);
     free(p);
 }
 
@@ -536,7 +547,7 @@ void disable_write(liby_client *client) {
     mod_chan_of_epoller(client->epoller, client->ch);
 }
 
-int get_servers_of_loop(liby_loop *loop, liby_server **p) {
+int get_servers_of_loop(liby_loop *loop, liby_server ***p) {
     assert(loop && p);
 
     int ret = 0;
@@ -546,45 +557,50 @@ int get_servers_of_loop(liby_loop *loop, liby_server **p) {
         int i = 0;
         struct list_head *pos = NULL;
 
-        list_for_each(pos, &(loop->servers.list)) { ret++; }
+        list_for_each(pos, &(loop->servers.list)) {
+            ret++;
+        }
 
         NALLOC(liby_server *, servers, ret);
         list_for_each(pos, &(loop->servers.list)) {
             servers[i++] = list_entry(pos, liby_server, list);
         }
 
-        *p = *servers;
+        *p = servers;
     }
 
 out:
     return ret;
 }
 
-int get_clients_of_loop(liby_loop *loop, liby_client **p) {
+int get_clients_of_loop(liby_loop *loop, liby_client ***p) {
     assert(loop && p);
 
     int ret = 0;
     if (list_empty(&(loop->clients.list))) {
+        log_info("no clients");
         *p = NULL;
     } else {
         int i = 0;
         struct list_head *pos = NULL;
 
-        list_for_each(pos, &(loop->clients.list)) { ret++; }
+        list_for_each(pos, &(loop->clients.list)) {
+            ret++;
+        }
 
         NALLOC(liby_client *, clients, ret);
         list_for_each(pos, &(loop->clients.list)) {
             clients[i++] = list_entry(pos, liby_client, list);
         }
 
-        *p = *clients;
+        *p = clients;
     }
 
 out:
     return ret;
 }
 
-int get_clients_of_server(liby_server *server, liby_client **p) {
+int get_clients_of_server(liby_server *server, liby_client ***p) {
     assert(server && p);
 
     int ret = 0;
@@ -594,14 +610,16 @@ int get_clients_of_server(liby_server *server, liby_client **p) {
         int i = 0;
         struct list_head *pos = NULL;
 
-        list_for_each(pos, &(server->clients.list)) { ret++; }
+        list_for_each(pos, &(server->clients.list)) {
+            ret++;
+        }
 
         NALLOC(liby_client *, clients, ret);
         list_for_each(pos, &(server->clients.list)) {
             clients[i++] = list_entry(pos, liby_client, list);
         }
 
-        *p = *clients;
+        *p = clients;
     }
 
 out:
@@ -623,4 +641,48 @@ void set_acceptor_for_server(liby_server *server, accept_func acceptor) {
     if (server != NULL) {
         server->acceptor = acceptor;
     }
+}
+
+static void liby_client_update_state(liby_client *client) {
+    assert(client);
+    if (client->destroy) {
+        liby_client_destroy(client);
+        return;
+    }
+    if (list_empty(&(client->read_list_head.list)) &&
+        client->curr_read_task == NULL) {
+        disable_read(client);
+    } else {
+        enable_read(client);
+    }
+    if (list_empty(&(client->write_list_head.list)) &&
+        client->curr_write_task == NULL) {
+        disable_write(client);
+    } else {
+        enable_write(client);
+    }
+}
+
+void liby_client_set_data(liby_client *client, void *data, release_func func) {
+    assert(client && data);
+    client->release_data_func = func;
+    client->data = data;
+}
+
+void liby_client_set_data_with_free(liby_client *client, void *data) {
+    liby_client_set_data(client, data, free);
+}
+
+void liby_client_set_data_without_free(liby_client *client, void *data) {
+    liby_client_set_data(client, data, NULL);
+}
+
+void *liby_client_get_data(liby_client *client) {
+    assert(client);
+    return client->data;
+}
+
+void liby_destroy_client_later(liby_client *client) {
+    assert(client);
+    client->destroy = 1;
 }

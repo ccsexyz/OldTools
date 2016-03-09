@@ -1,44 +1,41 @@
-#include "liby.h"
+#include "../src/liby.h"
 
-liby_server *echo_server;
-
-void read_all_handler(liby_client *client, char *buf, off_t length, int ec) {
-    if (ec) {
-        fprintf(stderr, "%s\n", "error!");
-        del_client_from_server(client, client->server);
-        return;
-    } else {
-        // write(1, buf, length);
-        liby_client *head = get_clients_of_server(echo_server);
-        while (head) {
-            if (head != client) liby_async_write_some(head, buf, length, NULL);
-            head = head->next;
-        }
-        liby_async_read(client, read_all_handler);
-    }
+void write_all_handler(liby_client *client, char *buf, off_t length, int ec) {
+    log_info("write all!");
+    free(buf);
 }
 
-void echo_aceptor(liby_client *client) {
-    printf("echo_aceptor!\n");
-    if (client == NULL) printf("client is NULL");
+void read_all_handler(liby_client *client, char *buf, off_t length, int ec) {
+    if (!ec) {
+        log_info("recv %s", buf);
+        liby_client **clients;
+        int n = get_clients_of_server(client->server, &clients);
+        log_info("n = %d", n);
+        for (int i = 0; i < n; i++) {
+            char *mbuf = malloc(length);
+            memcpy(mbuf, buf, length);
+            if (clients[i] != client)
+                liby_async_write_some(clients[i], mbuf, length,
+                                      write_all_handler);
+        }
+        free(clients);
+        liby_async_read(client, read_all_handler);
+    } else {
+        log_err("read");
+    }
+    free(buf);
+}
+
+void chat_acceptor(liby_client *client) {
+    assert(client);
     liby_async_read(client, read_all_handler);
 }
 
 int main(int argc, char **argv) {
-    echo_server = liby_server_init("localhost", "9377");
-    if (echo_server == NULL) exit(1);
-
-    epoller_t *loop = epoller_init(10240);
-    if (loop == NULL) exit(2);
-
-    set_acceptor_for_server(echo_server, echo_aceptor);
-
-    add_server_to_epoller(echo_server, loop);
-
-    run_epoll_main_loop(loop, get_default_epoll_handler());
-
-    liby_server_destroy(echo_server);
-    epoller_destroy(loop);
-
+    liby_server *chat_server =
+        liby_server_init("0.0.0.0", "9377", chat_acceptor);
+    liby_loop *loop = liby_create_easy();
+    add_server_to_loop(chat_server, loop);
+    run_liby_main_loop(loop);
     return 0;
 }

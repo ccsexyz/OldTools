@@ -1,7 +1,5 @@
 #include "../src/liby.h"
 
-//暂时还只能用全局变量
-
 void output_handler(liby_client *client, char *buf, off_t length, int ec) {
     if (ec != 0) {
         log_quit("error!");
@@ -15,11 +13,11 @@ void input_handler(liby_client *input_client, char *buf, off_t length, int ec) {
         // error
         log_quit("input error");
     } else {
-        liby_client *p;
+        liby_client **p;
         int n = get_clients_of_loop(input_client->loop, &p);
         log_info("n = %d\n", n);
         for(int i = 0; i < n; i++) {
-            liby_async_write_some(p + i, buf, length, output_handler);
+            liby_async_write_some(p[i], buf, length, output_handler);
         }
         free(p);
         //liby_async_write_some(client, buf, length, output_handler);
