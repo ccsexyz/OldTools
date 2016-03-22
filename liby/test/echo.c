@@ -30,8 +30,8 @@ void echo_aceptor(liby_client *client) {
 
 int main(int argc, char **argv) {
     liby_server *echo_server = liby_server_init("0.0.0.0", "9377", echo_aceptor);
-    liby_loop *loop = liby_create_easy();
-    //liby_loop *loop = liby_loop_create(1);
+    //liby_loop *loop = liby_create_easy();
+    liby_loop *loop = liby_loop_create(0);
     add_server_to_loop(echo_server, loop);
     run_liby_main_loop(loop);
     return 0;
