@@ -1,47 +1,49 @@
-#ifndef LIBY_TCPCLIENT_H
-#define LIBY_TCPCLIENT_H
+#ifndef POLLERTEST_TCPCLIENT_H
+#define POLLERTEST_TCPCLIENT_H
 
-#include "Chanel.h"
-#include "Connection.h"
+#include "util.h"
 
-class TcpClient final {
+namespace Liby {
+class Chanel;
+class Connection;
+class File;
+class Poller;
+class EventLoop;
+
+class TcpClient final : clean_ {
 public:
-    using ConnectorCallback = std::function<void(ConnectionPtr &)>;
-    TcpClient(const std::string server_path, const std::string server_port)
-        : clfd_(FileHandle::async_connect(server_path, server_port)),
-          chan_(std::make_shared<Chanel>()) {
-        chan_->setFileHandlePtr(clfd_);
-    }
-    void setPoller(Poller *poller) { chan_->setPoller(poller); }
-    void start() {
-        chan_->setEvents(EPOLLOUT);
-        chan_->setWritEventCallback(
-            std::bind(&TcpClient::handleConnectEvent, this));
-        chan_->setErroEventCallback(
-            std::bind(&TcpClient::handleErrnoEvent, this));
-        chan_->addChanelToPoller();
-    }
-    void setConnectorCallback(ConnectorCallback cb) { connectorCallback_ = cb; }
-    void handleErrnoEvent() {
-        clfd_.reset();
-        chan_.reset();
-    }
-    void handleConnectEvent() {
-        auto conn_ = std::make_shared<Connection>(chan_);
-        chan_.reset();
-        clfd_.reset();
-        if (connectorCallback_) {
-            connectorCallback_(conn_);
-        }
-    }
-    int clfd() const { return clfd_->fd(); }
+    using ConnectorCallback = std::function<void(std::shared_ptr<Connection>)>;
+    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    TcpClient(const std::string &server_path, const std::string &server_port);
+    void setPoller(Poller *poller) { poller_ = poller; }
+    Poller *getPoller() const { return poller_; }
+    void setEventLoop(EventLoop *loop) { loop_ = loop; }
+    EventLoop *getEventLoop() const { return loop_; }
+    int clientfd() const { return clientfd_; }
+    void start();
+    void setConnectorCallback(ConnectorCallback cb) { connector_ = cb; }
+    void setReadEventCallback(ConnCallback cb) { readEventCallback_ = cb; }
+    void setWriteAllCallback(ConnCallback cb) { writeAllCallback_ = cb; }
+    void setErroEventCallback(ConnCallback cb) { erroEventCallback_ = cb; }
+    void runAsyncHandler(BasicHandler cb);
 
 private:
-    FileHandlePtr clfd_;
-    ChanelPtr chan_;
-    ConnectorCallback connectorCallback_;
+    void destroy();
+
+private:
+    int clientfd_;
+    Poller *poller_;
+    EventLoop *loop_;
+    std::shared_ptr<File> clientfp_;
+    std::shared_ptr<Chanel> chan_;
+    std::shared_ptr<Connection> conn_;
+    ConnectorCallback connector_;
+    ConnCallback erroEventCallback_;
+    ConnCallback readEventCallback_;
+    ConnCallback writeAllCallback_;
 };
 
 using TcpClientPtr = std::shared_ptr<TcpClient>;
+}
 
-#endif // LIBY_TCPCLIENT_H
+#endif // POLLERTEST_TCPCLIENT_H

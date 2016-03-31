@@ -1,117 +1,143 @@
 #include "Connection.h"
+#include "Buffer.h"
+#include "Chanel.h"
+#include "Poller.h"
+#include "string.h"
+
+using namespace Liby;
+
+Connection::Connection(Poller *poller, std::shared_ptr<File> &fp) {
+    assert(poller && fp && fp->fd() >= 0);
+    poller_ = poller;
+    chan_ = std::make_unique<Chanel>(poller, fp);
+    readBuf_ = std::make_unique<Buffer>(1024);
+    writBuf_ = std::make_unique<Buffer>(1024);
+}
 
 void Connection::init() {
-    chan_->setReadEventCallback(std::bind(&Connection::handleReadEvent, this));
-    chan_->setWritEventCallback(std::bind(&Connection::handleWritEvent, this));
-    chan_->setErroEventCallback(std::bind(&Connection::handleErroEvent, this));
+    chan_->setReadEventCallback(std::bind(&Connection::onRead, this));
+    chan_->setWritEventCallback(std::bind(&Connection::onWrit, this));
+    chan_->setErroEventCallback(std::bind(&Connection::onErro, this));
+    chan_->enableRead();
+    chan_->addChanel();
 }
 
-void Connection::handleReadEvent() {
-    DeferCaller defer([this] { updateConnectionState(); });
-    while (!readTaskQueue_.empty()) {
-        auto task = readTaskQueue_.front();
-        int ret = chan_->fileHandlePtr()->read(task.buf_ + task.offset_,
-                                               task.length_ - task.offset_);
+void Connection::onRead() {
+    int ret = chan_->filePtr()->read(*readBuf_);
+    if (ret > 0) {
+        if (readEventCallback_) {
+            readEventCallback_(shared_from_this());
+        }
+    } else {
+        if (ret != 0 && errno == EAGAIN) {
+            return;
+        } else {
+            if (errnoEventCallback_) {
+                errnoEventCallback_(shared_from_this());
+            }
+        }
+    }
+}
+
+void Connection::onWrit() {
+    if (writBuf_->size() > 0) {
+        int ret = chan_->filePtr()->write(*writBuf_);
         if (ret > 0) {
-            task.offset_ += ret;
-            if (task.offset_ >= task.min_except_bytes) {
-                if (task.handler_) {
-                    task.handler_(task.buf_, task.offset_, 0);
+            if (writBuf_->size() == 0) {
+                if (writeAllCallback_) {
+                    writeAllCallback_(shared_from_this());
                 }
-                readTaskQueue_.pop();
+                // chan_->enableWrit(false);
+                // chan_->updateChanel();
             }
         } else {
             if (ret != 0 && errno == EAGAIN) {
                 return;
             } else {
-                int ec = errno;
-                if (errno == 0 && ret == 0)
-                    ec = -1;
-                if (task.handler_) {
-                    task.handler_(task.buf_, task.offset_, ec);
+                if (errnoEventCallback_) {
+                    errnoEventCallback_(shared_from_this());
                 }
-                readTaskQueue_.pop();
-                defer.cancel();
-                handleErroEvent();
             }
         }
+    } else {
+        chan_->enableWrit(false);
+        chan_->updateChanel();
     }
 }
 
-void Connection::handleWritEvent() {
-    DeferCaller defer([this] { updateConnectionState(); });
-    while (!writTaskQueue_.empty()) {
-        auto task = writTaskQueue_.front();
-        int ret = chan_->fileHandlePtr()->write(task.buf_ + task.offset_,
-                                                task.length_ - task.offset_);
-        if (ret > 0) {
-            task.offset_ += ret;
-            if (task.offset_ >= task.min_except_bytes) {
-                if (task.handler_) {
-                    task.handler_(task.buf_, task.offset_, 0);
-                }
-                writTaskQueue_.pop();
-            }
-        } else {
-            if (ret != 0 && errno == EAGAIN) {
-                return;
-            } else {
-                int ec = errno;
-                if (errno == 0 && ret == 0)
-                    ec = -1;
-                if (task.handler_) {
-                    task.handler_(task.buf_, task.offset_, ec);
-                }
-                writTaskQueue_.pop();
-                defer.cancel();
-                handleErroEvent();
-            }
-        }
+void Connection::onErro() {
+    if (errnoEventCallback_) {
+        errnoEventCallback_(shared_from_this());
     }
 }
 
-void Connection::handleErroEvent() {
-    int savedErrno = errno == 0 ? -1 : errno;
-    while (!readTaskQueue_.empty()) {
-        auto task = readTaskQueue_.pop_front();
-        if (task.handler_) {
-            task.handler_(task.buf_, task.offset_, savedErrno);
-        }
+void Connection::setReadCallback(ConnCallback cb) { readEventCallback_ = cb; }
+
+void Connection::setWritCallback(ConnCallback cb) { writeAllCallback_ = cb; }
+
+void Connection::setErroCallback(ConnCallback cb) { errnoEventCallback_ = cb; }
+
+Poller *Connection::getPoller() const { return poller_; }
+
+void Connection::runEventHandler(BasicHandler handler) {
+    assert(poller_);
+    poller_->runEventHandler(handler);
+}
+
+void Connection::destroy() {
+    chan_.reset();
+    readBuf_.reset();
+    writBuf_.reset();
+    readEventCallback_ = nullptr;
+    writeAllCallback_ = nullptr;
+    errnoEventCallback_ = nullptr;
+}
+
+int Connection::getConnfd() const { return chan_->filePtr()->fd(); }
+
+void Connection::send(const char *buf, off_t len) {
+    writBuf_->append(buf, len);
+    chan_->enableWrit();
+    chan_->updateChanel();
+}
+
+void Connection::send(Buffer &buf) {
+    writBuf_->append(buf);
+    buf.retrieve();
+    chan_->enableWrit();
+    chan_->updateChanel();
+}
+
+void Connection::send(Buffer &&buf) {
+    writBuf_->append(buf);
+    buf.retrieve();
+    chan_->enableWrit();
+    chan_->updateChanel();
+}
+
+void Connection::send(const char *buf) {
+    assert(buf);
+    send(buf, ::strlen(buf));
+}
+
+void Connection::send(const char c) { writBuf_->append(&c, 1); }
+
+Buffer &Connection::read() { return *readBuf_; }
+
+void Connection::suspendRead(bool flag) {
+    if (flag) {
+        chan_->enableRead(false);
+    } else {
+        chan_->enableRead(true);
     }
-    while (!writTaskQueue_.empty()) {
-        auto task = writTaskQueue_.pop_front();
-        if (task.handler_) {
-            task.handler_(task.buf_, task.offset_, savedErrno);
-        }
+    chan_->updateChanel();
+}
+
+void Connection::suspendWrit(bool flag) {
+    if (flag) {
+        chan_->enableWrit(false);
+    } else {
+        chan_->enableWrit(true);
     }
-}
-
-void Connection::setPoller(Poller *poller) {
-    chan_->setEvents(EPOLLERR | EPOLLRDHUP | EPOLLHUP);
-    chan_->setPoller(poller);
-    chan_->addChanelToPoller();
-}
-
-void Connection::updateConnectionState() {
-    chan_->enableRead(!readTaskQueue_.empty());
-    chan_->enableWrit(!writTaskQueue_.empty());
-    chan_->flushChanelState();
-}
-
-void Connection::async_read_some(char *buf, off_t buffersize,
-                                 off_t min_except_bytes, io_handler handler) {
-    io_task task;
-    task.buf_ = buf;
-    task.length_ = buffersize;
-    task.handler_ = handler;
-    readTaskQueue_.push_back(task);
-}
-
-void Connection::async_writ_some(char *buf, off_t buffersize,
-                                 off_t min_except_bytes, io_handler handler) {
-    io_task task;
-    task.buf_ = buf;
-    task.length_ = buffersize;
-    task.handler_ = handler;
-    writTaskQueue_.push_back(task);
+    chan_->updateChanel();
 }

@@ -1,48 +1,62 @@
-#ifndef LIBY_TCPSERVER_H
-#define LIBY_TCPSERVER_H
+#ifndef POLLERTEST_TCPSERVER_H
+#define POLLERTEST_TCPSERVER_H
 
-#include "Chanel.h"
 #include "Connection.h"
-#include "FileHandle.h"
-#include <iostream>
-#include <sys/socket.h>
+#include "util.h"
+#include <map>
+#include <mutex>
 
+namespace Liby {
+class File;
+class Chanel;
+class Connection;
 class EventLoop;
+class Poller;
 
-class TcpServer final {
+class TcpServer final : clean_ {
 public:
-    using AcceptorCallback = std::function<void(ConnectionPtr &)>;
-    TcpServer(const std::string server_path, const std::string server_port)
-        : srvfd_(FileHandle::initserver(server_path, server_port)),
-          chan_(std::make_shared<Chanel>()) {
-        chan_->setFileHandlePtr(srvfd_);
+    using AcceptorCallback = std::function<void(std::shared_ptr<Connection>)>;
+    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    TcpServer(const std::string &server_path, const std::string server_port);
+    void start();
+
+    void setReadEventCallback(ConnCallback cb) { readEventCallback_ = cb; }
+    void setWriteAllCallback(ConnCallback cb) { writeAllCallback_ = cb; }
+    void setErroEventCallback(ConnCallback cb) { erroEventCallback_ = cb; }
+
+    void setEventLoop(EventLoop *loop) {
+        assert(loop);
+        loop_ = loop;
     }
-    void setPoller(Poller *poller) { chan_->setPoller(poller); }
-    void start() {
-        chan_->setEvents(EPOLLIN);
-        chan_->setReadEventCallback(
-            std::bind(&TcpServer::handleAcceptEvent, this));
-        chan_->setErroEventCallback(
-            std::bind(&TcpServer::handleErroEvent, this));
-        chan_->addChanelToPoller();
+    void setAcceptorCallback(const AcceptorCallback &cb) {
+        acceptorCallback_ = cb;
     }
-    void handleAcceptEvent();
-    void handleErroEvent() {
-        srvfd_.reset();
-        chan_.reset();
-    }
-    void setAcceptorCallback(AcceptorCallback cb) { acceptorCallback_ = cb; }
-    int srvfd() const { return srvfd_->fd(); }
-    void setEventLoop(EventLoop *loop) { loop_ = loop; }
+    void setPoller(Poller *poller) { poller_ = poller; }
+    int listenfd() const { return listenfd_; }
+    void closeConn(std::shared_ptr<Connection> connPtr);
+    void runHanlderOnConns(std::function<void(std::shared_ptr<Connection>)> cb);
 
 private:
-    FileHandlePtr srvfd_;
-    ChanelPtr chan_;
-    EventLoop *loop_ = nullptr;
+    void initConnection(std::shared_ptr<Connection> &connPtr);
+    void handleAcceptEvent();
+    void handleErroEvent();
+    void handleErroEventOfConn(std::shared_ptr<Connection> &&connPtr);
+
+private:
+    int listenfd_;
+    Poller *poller_;
+    EventLoop *loop_;
     AcceptorCallback acceptorCallback_;
-    BlockingQueue<std::weak_ptr<Connection>> conns_;
+    ConnCallback readEventCallback_;
+    ConnCallback writeAllCallback_;
+    ConnCallback erroEventCallback_;
+    std::shared_ptr<File> listenfp_;
+    std::shared_ptr<Chanel> chan_;
+    std::mutex m_;
+    std::map<int, std::shared_ptr<Connection>> conns_;
 };
 
 using TcpServerPtr = std::shared_ptr<TcpServer>;
+}
 
-#endif // LIBY_TCPSERVER_H
+#endif // POLLERTEST_TCPSERVER_H

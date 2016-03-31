@@ -1,4 +1,6 @@
 #include "util.h"
+#include <list>
+#include <mutex>
 #include <signal.h>
 #include <unordered_map>
 
@@ -22,4 +24,35 @@ void Signal::reset(int signo) {
         ::signal(signo, stored_funcs[signo]);
         stored_funcs.erase(k1);
     }
+}
+
+static std::mutex ExitCallerMutex;
+static std::list<std::function<void()>> ExitCallerFunctors;
+
+ExitCaller::ExitCaller() {
+    std::cout << __func__ << std::endl;
+    ::atexit(ExitCaller::callOnExit);
+}
+
+ExitCaller &ExitCaller::getCaller() {
+    static ExitCaller caller;
+    return caller;
+}
+
+void ExitCaller::call(const std::function<void()> &functor) {
+    ExitCaller::getCaller().callImp(functor);
+}
+
+void ExitCaller::callImp(const std::function<void()> &functor) {
+    std::lock_guard<std::mutex> G_(ExitCallerMutex);
+    ExitCallerFunctors.push_back(functor);
+}
+
+void ExitCaller::callOnExit() {
+    std::lock_guard<std::mutex> G_(ExitCallerMutex);
+    std::cout << __func__ << std::endl;
+    std::for_each(ExitCallerFunctors.begin(), ExitCallerFunctors.end(),
+                  [](const decltype(*ExitCallerFunctors.begin()) &functor) {
+                      functor();
+                  });
 }

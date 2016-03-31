@@ -1,35 +1,43 @@
-#ifndef LIBY_EVENTLOOP_H
-#define LIBY_EVENTLOOP_H
+#ifndef POLLERTEST_EVENTLOOP_H
+#define POLLERTEST_EVENTLOOP_H
 
-#include "Chanel.h"
-#include "Poller.h"
-#include "TcpClient.h"
-#include "TcpServer.h"
+#include "util.h"
 #include <thread>
 #include <vector>
 
-class EventLoop final {
+namespace Liby {
+class Poller;
+class PollerEpoll;
+class PollerPoll;
+class PollerSelect;
+class TcpServer;
+class TcpClient;
+
+class EventLoop final : clean_ {
 public:
-    explicit EventLoop(int n = 0) : n_(n) {
-        pollers_.reserve(n + 1);
-        pollers_.push_back(Poller());
-    }
-    void RunMainLoop();
-    Poller *getSuitablePoller(int fd) {
-        if (n_ == 0)
-            return &pollers_.front();
-        else
-            return &pollers_[fd % n_ + 1];
-    }
-    TcpServerPtr creatTcpServer(const std::string server_path,
-                                const std::string server_port);
-    TcpClientPtr creatTcpClient(const std::string server_path,
-                                const std::string server_port);
+    enum class PollerChooser { EPOLL, POLL, SELECT, KQUEUE };
+    explicit EventLoop(int n = 0, PollerChooser chooser = PollerChooser::EPOLL);
+    ~EventLoop();
+    void RunMainLoop(std::function<bool()> cb = [] { return true; });
+    std::shared_ptr<Poller> &getSuitablePoller(int fd);
+    std::shared_ptr<Poller> &getSuitablePoller2(int fd);
+    std::shared_ptr<Poller> &getFirstPoller();
+    std::shared_ptr<TcpServer> creatTcpServer(const std::string &server_path,
+                                              const std::string &server_port);
+    std::shared_ptr<TcpClient> creatTcpClient(const std::string &server_path,
+                                              const std::string &server_port);
 
 private:
-    int n_;
-    std::vector<Poller> pollers_;
+    std::shared_ptr<Poller> newPoller();
+    void worker_thread(int index);
+
+private:
+    int N;
+    PollerChooser chooser_;
+    std::function<bool()> insistFunctor_;
+    std::vector<std::shared_ptr<Poller>> pollers_;
     std::vector<std::thread> threads_;
 };
+}
 
-#endif // LIBY_EVENTLOOP_H
+#endif // POLLERTEST_EVENTLOOP_H

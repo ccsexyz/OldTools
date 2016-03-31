@@ -1,81 +1,80 @@
-#ifndef LIBY_CHANEL_H
-#define LIBY_CHANEL_H
+#ifndef POLLERTEST_CHANEL_H
+#define POLLERTEST_CHANEL_H
 
-#include "FileHandle.h"
-#include "Poller.h"
+#include "File.h"
 #include "util.h"
 
-class Chanel {
+namespace Liby {
+class Poller;
+
+class Chanel final : clean_ {
 public:
-    using ChanelHandler = std::function<void()>;
+    static const int kRead_ = 0x1;
+    static const int kWrit_ = 0x2;
+    static const int kErro_ = 0x4;
 
     Chanel() = default;
-    Chanel(Poller *poller, FileHandlePtr fh, int events)
-        : poller_(poller), fh_(fh), events_(events) {}
-    ~Chanel() { removeChanelFromPoller(); }
-
-    void setPoller(Poller *poller) { poller_ = poller; }
-    void setFileHandlePtr(FileHandlePtr fh) { fh_ = fh; }
-    void setEvents(int events) { events_ = events; }
-
-    FileHandlePtr &fileHandlePtr() { return fh_; }
-
-    void runHandler() { handler_(); }
+    Chanel(Poller *poller, FilePtr fp) : poller_(poller), fp_(fp) {}
+    ~Chanel() { removeChanel(); }
 
     void updateRevents(int revents) { revents_ = revents; }
-
-    bool isError() const {
-        return revents_ & EPOLLHUP || revents_ & EPOLLRDHUP ||
-               revents_ & EPOLLERR;
+    void setEvents(int events) { events_ = events; }
+    int getEvents() const { return events_; }
+    int getChanelFd() const {
+        assert(fp_->fd() >= 0);
+        return fp_->fd();
     }
-    bool Readable() const { return revents_ & EPOLLIN; }
-    bool Writable() const { return revents_ & EPOLLOUT; }
+    bool isEventsChanged() { return isEventsChanged_; }
 
+    FilePtr &filePtr() { return fp_; }
+
+    void setPoller(Poller *poller) { poller_ = poller; }
+    void setFilePtr(FilePtr fp) { fp_ = fp; }
     void enableRead(bool flag = true) {
-        events_ = flag ? (events_ | EPOLLIN) : (events_ & ~EPOLLIN);
+        if (flag ^ (events_ & kRead_)) {
+            isEventsChanged_ = true;
+            events_ = flag ? (events_ | kRead_) : (events_ & ~kRead_);
+        }
     }
     void enableWrit(bool flag = true) {
-        events_ = flag ? (events_ | EPOLLOUT) : (events_ & ~EPOLLOUT);
+        if (flag ^ (events_ & kWrit_)) {
+            isEventsChanged_ = true;
+            events_ = flag ? (events_ | kWrit_) : (events_ & ~kWrit_);
+        }
     }
-    void flushChanelState() { ctl(EPOLL_CTL_MOD); }
 
-    void handleEvent();
-    void setReadEventCallback(const ChanelHandler &cb) {
+    bool isError() const { return revents_ & kErro_; }
+    bool Readable() const { return revents_ & kRead_; }
+    bool Writable() const { return revents_ & kWrit_; }
+
+    void removeChanel();
+    void updateChanel();
+    void addChanel();
+
+    void setReadEventCallback(const BasicHandler &cb) {
         readEventCallback_ = cb;
     }
-    void setWritEventCallback(const ChanelHandler &cb) {
+    void setWritEventCallback(const BasicHandler &cb) {
         writEventCallback_ = cb;
     }
-    void setErroEventCallback(const ChanelHandler &cb) {
+    void setErroEventCallback(const BasicHandler &cb) {
         erroEventCallback_ = cb;
     }
 
-    void removeChanelFromPoller() {
-        ctl(EPOLL_CTL_DEL);
-        poller_ = NULL;
-    }
-
-    void modChanelOfPoller() { ctl(EPOLL_CTL_MOD); }
-
-    void addChanelToPoller() { ctl(EPOLL_CTL_ADD); }
-
-    Poller *getPoller() const { return poller_; }
+    void handleEvent();
 
 private:
-    void ctl(int op);
+    BasicHandler readEventCallback_;
+    BasicHandler writEventCallback_;
+    BasicHandler erroEventCallback_;
 
-private:
-    ChanelHandler readEventCallback_;
-    ChanelHandler writEventCallback_;
-    ChanelHandler erroEventCallback_;
-
-    int events_;
-    int revents_;
-    Poller *poller_;
-    FileHandlePtr fh_;
-    ChanelHandler handler_;
+    FilePtr fp_;
+    Poller *poller_ = nullptr;
+    int events_ = 0;  // update by user
+    int revents_ = 0; // update by poller
+    bool isEventsChanged_ = false;
 };
-
 using ChanelPtr = std::shared_ptr<Chanel>;
+}
 
-#endif // LIBY_CHANEL_H
+#endif // POLLERTEST_CHANEL_H

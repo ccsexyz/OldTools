@@ -1,71 +1,57 @@
-#ifndef LIBY_CONNECTION_H
-#define LIBY_CONNECTION_H
+#ifndef POLLERTEST_CONNECTION_H
+#define POLLERTEST_CONNECTION_H
 
-#include "BlockingQueue.h"
-#include "Chanel.h"
-#include "Poller.h"
+#include "Buffer.h"
 #include "util.h"
-#include <condition_variable>
-#include <mutex>
+#include <memory>
 
-class Connection;
-using ConnectionPtr = std::shared_ptr<Connection>;
+namespace Liby {
+class Chanel;
+class File;
+class Poller;
 
-using io_handler = std::function<void(char *, off_t, int)>;
-
-class io_task final {
+class Connection final : clean_,
+                         public std::enable_shared_from_this<Connection> {
 public:
-    ~io_task() {
-        if (shouldDelete_)
-            delete[] buf_;
-    }
-    void setAutoDelete() { shouldDelete_ = true; }
-    bool shouldDelete_ = false;
-    char *buf_ = nullptr;
-    off_t length_ = 0;
-    off_t offset_ = 0;
-    off_t min_except_bytes = 0;
-    io_handler handler_;
-};
+    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    Connection(Poller *poller, std::shared_ptr<File> &fp);
 
-//  : public std::enable_shared_from_this<Connection>
-class Connection final {
-public:
-    using EventCallback = std::function<void(ConnectionPtr &)>;
-    Connection(ChanelPtr &&chan) : chan_(std::move(chan)) { init(); }
-    Connection(const ChanelPtr &chan) : chan_(chan) { init(); }
-
-    void async_read(char *buf, off_t buffersize, io_handler handler) {
-        async_read_some(buf, buffersize, 0, handler);
-    }
-    void async_read(io_handler handler) {
-        async_read_some(new char[defaultBufferSize_], defaultBufferSize_, 0,
-                        handler);
-    }
-    void async_read_some(char *buf, off_t buffersize, off_t min_except_bytes,
-                         io_handler handler);
-
-    void async_writ(char *buf, off_t buffersize, io_handler handler) {
-        async_writ_some(buf, buffersize, buffersize, handler);
-    }
-    void async_writ_some(char *buf, off_t buffersize, off_t min_except_bytes,
-                         io_handler handler);
-
-    void setDefaultBufferSize(size_t newSize) { defaultBufferSize_ = newSize; }
-    void updateConnectionState();
-    void setPoller(Poller *poller);
-
-private:
     void init();
-    void handleReadEvent();
-    void handleWritEvent();
-    void handleErroEvent();
+
+    void send(const char *buf, off_t len);
+    void send(Buffer &buf);
+    void send(Buffer &&buf);
+    void send(const char *buf);
+    void send(const char c);
+    Buffer &read();
+
+    void setReadCallback(ConnCallback cb);
+    void setWritCallback(ConnCallback cb);
+    void setErroCallback(ConnCallback cb);
+
+    Poller *getPoller() const;
+    int getConnfd() const;
+    void runEventHandler(BasicHandler handler);
+
+    void suspendRead(bool flag = true);
+    void suspendWrit(bool flag = true);
+
+    void destroy();
 
 private:
-    int defaultBufferSize_ = 4096;
-    ChanelPtr chan_;
-    BlockingQueue<io_task> readTaskQueue_;
-    BlockingQueue<io_task> writTaskQueue_;
-};
+    void onRead();
+    void onWrit();
+    void onErro();
 
-#endif // LIBY_CONNECTION_H
+private:
+    Poller *poller_;
+    std::unique_ptr<Chanel> chan_;
+    std::unique_ptr<Buffer> readBuf_;
+    std::unique_ptr<Buffer> writBuf_;
+    ConnCallback readEventCallback_;
+    ConnCallback writeAllCallback_;
+    ConnCallback errnoEventCallback_;
+};
+}
+
+#endif // POLLERTEST_CONNECTION_H

@@ -1,12 +1,25 @@
 #ifndef LIBY_UTIL_H
 #define LIBY_UTIL_H
 
+#include "Logger.h"
 #include <algorithm>
+#include <assert.h>
 #include <functional>
 #include <iostream>
 #include <sys/time.h>
 
-class DeferCaller final {
+using BasicHandler = std::function<void()>;
+
+struct clean_ {
+public:
+    clean_(const clean_ &) = delete;
+    clean_(clean_ &&) = delete;
+    clean_ &operator=(const clean_ &) = delete;
+    clean_() = default;
+    ~clean_() = default;
+};
+
+class DeferCaller final : clean_ {
 public:
     DeferCaller(std::function<void()> &&functor)
         : functor_(std::move(functor)) {}
@@ -16,12 +29,46 @@ public:
             functor_();
     }
     void cancel() { functor_ = nullptr; }
-    DeferCaller(const DeferCaller &that) = delete;
-    DeferCaller(DeferCaller &&that) = delete;
-    DeferCaller &operator=(const DeferCaller &that) = delete;
 
 private:
     std::function<void()> functor_;
+};
+
+class ExitCaller final : clean_ {
+public:
+    static ExitCaller &getCaller();
+    static void call(const std::function<void()> &functor);
+
+private:
+    void callImp(const std::function<void()> &functor);
+    static void callOnExit();
+
+private:
+    ExitCaller();
+};
+
+class DeconstructCaller : clean_ {
+public:
+    DeconstructCaller(std::initializer_list<BasicHandler> &&callerList = {}) {
+        if (callerList.size() > 0) {
+            handlers_ = new (std::nothrow) std::list<BasicHandler>;
+            if (handlers_ == nullptr)
+                return;
+            for (auto &functor_ : callerList) {
+                handlers_->emplace_back(functor_);
+            }
+        }
+    }
+    virtual ~DeconstructCaller() {
+        if (handlers_ == NULL)
+            return;
+        for (auto &functor_ : *handlers_) {
+            functor_();
+        }
+    }
+
+private:
+    std::list<BasicHandler> *handlers_ = nullptr;
 };
 
 // using gettimeofday
@@ -59,7 +106,12 @@ public:
 
     std::string toString() const {
         char buf[48] = {0};
-        return std::string(ctime_r(&(tv_.tv_sec), buf));
+        ctime_r(&(tv_.tv_sec), buf);
+        for (int i = 0; buf[i]; i++) {
+            if (buf[i] == '\r' || buf[i] == '\n')
+                buf[i] = '\0';
+        }
+        return std::string(buf);
     }
 
     bool invalid() const { return tv_.tv_sec == 0 && tv_.tv_usec == 0; }
@@ -67,6 +119,18 @@ public:
 
     time_t sec() const { return tv_.tv_sec; }
     suseconds_t usec() const { return tv_.tv_usec; }
+
+    uint64_t toMillSec() const {
+        return tv_.tv_sec * 1000 + tv_.tv_usec / 1000;
+    }
+    double toSecF() const {
+        return static_cast<double>(tv_.tv_usec) / 1000000.0 +
+               static_cast<double>(tv_.tv_sec);
+    }
+    double toMillSecF() const {
+        return static_cast<double>(tv_.tv_usec) / 1000.0 +
+               static_cast<double>(tv_.tv_sec * 1000);
+    }
 
     // if this > rhs return 1
     // elif == rhs return 0
@@ -125,6 +189,22 @@ class Signal final {
 public:
     static void signal(int signo, const std::function<void()> &handler);
     static void reset(int signo);
+};
+
+class BaseException {
+public:
+    BaseException(const std::string &filename, int linenumber,
+                  const std::string errmsg)
+        : filename_(filename), linenumber_(linenumber), errmsg_(errmsg) {}
+    virtual ~BaseException() = default;
+    std::string what() {
+        return filename_ + std::to_string(linenumber_) + errmsg_;
+    }
+
+private:
+    int linenumber_;
+    std::string filename_;
+    std::string errmsg_;
 };
 
 #endif // LIBY_UTIL_H
