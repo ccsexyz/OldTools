@@ -553,18 +553,13 @@ void PollerKevent::removeChanel(Chanel *ch) {
 #ifdef __APPLE__
     assert(ch && ch->getChanelFd() >= 0);
 
-    //    struct kevent changes;
-    //    EV_SET(&changes, ch->getChanelFd(), 0, EV_DELETE, 0, 0, NULL);
-    //    changes_.push_back(changes);
     struct kevent changes;
     static int i = 0;
     i++;
     EV_SET(&changes, ch->getChanelFd(), EVFILT_READ, EV_DELETE, 0, 0, NULL);
     int k1 = ::kevent(kq_, &changes, 1, NULL, 0, NULL);
-    int savedErrno1 = errno;
     EV_SET(&changes, ch->getChanelFd(), EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     int k2 = ::kevent(kq_, &changes, 1, NULL, 0, NULL);
-    int savedErrno2 = errno;
     eventsSize_--;
 #endif
 }
