@@ -1,4 +1,7 @@
 #include "Poller.h"
+#include "Chanel.h"
+#include "EventQueue.h"
+#include "TimerQueue.h"
 #include <string.h>
 #ifdef __linux__
 #include <sys/epoll.h>
@@ -11,52 +14,84 @@
 
 using namespace Liby;
 
+Poller::Poller() {
+    eventQueue_ = std::make_unique<EventQueue>(this);
+    timerQueue_ = std::make_unique<TimerQueue>(this);
+}
+
+// 析构函数必须在此定义,否则会导致析构函数找不到EventQueue的定义
+Poller::~Poller() { ; }
+
+void Poller::init() {
+    eventQueue_->setPoller(this);
+    eventQueue_->start();
+    timerQueue_->setPoller(this);
+    timerQueue_->start();
+}
+
+void Poller::wakeup() {
+    assert(eventQueue_);
+    eventQueue_->wakeup();
+}
+
+TimerId Poller::runAt(const Timestamp &timestamp, const BasicHandler &handler) {
+    Timer timer(timestamp, handler);
+    timerQueue_->insert(timer);
+    return timer.id();
+}
+
+TimerId Poller::runAfter(const Timestamp &timestamp,
+                         const BasicHandler &handler) {
+    return runAt(timestamp + Timestamp::now(), handler);
+}
+
+TimerId Poller::runEvery(const Timestamp &timestamp,
+                         const BasicHandler &handler) {
+    TimerId id = Timer::getOneValidId();
+    runEveryHelper(id, timestamp, handler);
+    return id;
+}
+
+#ifdef __APPLE__
+void Poller::handleTimeoutEvents() { timerQueue_->handleTimeoutEvents(); }
+#endif
+
+void Poller::runEveryHelper(TimerId id, const Timestamp &timestamp,
+                            const BasicHandler &handler) {
+    Timer timer(id, timestamp + Timestamp::now(),
+                [handler, timestamp, this, id] {
+                    runEveryHelper(id, timestamp, handler);
+                    handler();
+                });
+    timerQueue_->insert(timer);
+}
+
+void Poller::cancelTimer(TimerId id) { timerQueue_->cancel(id); }
+
+void Poller::cancelAllTimer() { timerQueue_->cancelAll(); }
+
+void Poller::runEventHandler(const BasicHandler &handler) {
+    eventQueue_->pushHandler(handler);
+    wakeup();
+}
+
+#ifdef __APPLE__
+Timestamp Poller::getMinTimestamp() { return timerQueue_->getMinTimestamp(); }
+#endif
+
 PollerEpoll::PollerEpoll() {
 #ifdef __linux__
     pollerfd_ = ::epoll_create1(EPOLL_CLOEXEC);
-    // fatalif(pollerfd_ <= 0, "%s", ::strerror(errno));
+    fatalif(pollerfd_ <= 0, "%s", ::strerror(errno));
     pollerfp_ = std::make_shared<File>(pollerfd_);
 
-    eventfd_ = ::eventfd(1000, EFD_CLOEXEC | EFD_NONBLOCK);
-    // fatalif(eventfd_ <= 0, "%s", ::strerror(errno));
-    eventfp_ = std::make_shared<File>(eventfd_);
-
-    eventChanelPtr_ = std::make_shared<Chanel>(this, eventfp_);
-    eventHandlersPtr_ = std::make_shared<BlockingQueue<BasicHandler>>();
-
     events_.resize(defaultEpollSize);
-
-    initEventfd();
 #endif
 }
 
+void PollerEpoll::loop_once() {
 #ifdef __linux__
-void PollerEpoll::initEventfd() {
-    eventChanelPtr_->enableRead();
-    eventChanelPtr_->setReadEventCallback([this] {
-        if (!eventfp_)
-            return;
-        char buf[128];
-        int ret = eventfp_->read(buf, 128);
-        if (ret <= 0)
-            return;
-
-        while (!eventHandlersPtr_->empty()) {
-            auto f_ = eventHandlersPtr_->pop_front();
-            f_();
-        }
-    });
-    eventChanelPtr_->setErroEventCallback([this] {
-        eventChanelPtr_.reset();
-        eventHandlersPtr_.reset();
-    });
-    addChanel(eventChanelPtr_.get());
-}
-#endif
-
-void PollerEpoll::loop_once(int interMs) {
-#ifdef __linux__
-    int nfds = ::epoll_wait(pollerfd_, getEventsPtr(), events_.size(), interMs);
+    int nfds = ::epoll_wait(pollerfd_, getEventsPtr(), events_.size(), -1);
     for (int i = 0; i < nfds; i++) {
         Chanel *ch = reinterpret_cast<Chanel *>(events_[i].data.ptr);
         debug("event in chan %p", ch);
@@ -140,85 +175,40 @@ void PollerEpoll::updateChanel(Chanel *chan) {
 #endif
 }
 
-void PollerEpoll::runEventHandler(BasicHandler handler) {
-#ifdef __linux__
-    if (eventChanelPtr_ && eventfd_ >= 0) {
-        eventHandlersPtr_->push_back(handler);
-        wakeup();
-    } else {
-        error("Cannot run EventHandler");
-    }
-#endif
-}
-
-void PollerEpoll::wakeup() {
-    static int64_t this_is_a_number = 1;
-    eventfp_->write(&this_is_a_number, sizeof(this_is_a_number));
-}
-
 PollerSelect::PollerSelect() {
-#ifdef __linux__
-    eventfd_ = ::eventfd(1000, EFD_CLOEXEC | EFD_NONBLOCK);
-    // fatalif(eventfd_ <= 0, "%s", ::strerror(errno));
-    eventfp_ = std::make_shared<File>(eventfd_);
-#elif defined(__APPLE__)
-    int fildes[2];
-    ::pipe(fildes);
-    eventfd_ = fildes[0];
-    eventfp_ = std::make_shared<File>(eventfd_);
-    eventfd2_ = fildes[1];
-    eventfp2_ = std::make_shared<File>(eventfd2_);
-#endif
-
-    eventChanelPtr_ = std::make_shared<Chanel>(this, eventfp_);
-    eventHandlersPtr_ = std::make_shared<BlockingQueue<BasicHandler>>();
 
     chanels_.resize(48);
     FD_ZERO(&rset_);
     FD_ZERO(&wset_);
-
-    initEventfd();
 }
 
-void PollerSelect::initEventfd() {
-    eventChanelPtr_->enableRead();
-    eventChanelPtr_->setReadEventCallback([this] {
-        if (!eventfp_)
-            return;
-        char buf[128];
-        int ret = eventfp_->read(buf, 128);
-        if (ret <= 0)
-            return;
-
-        while (!eventHandlersPtr_->empty()) {
-            auto f_ = eventHandlersPtr_->pop_front();
-            f_();
-        }
-    });
-    eventChanelPtr_->setErroEventCallback([this] {
-        eventChanelPtr_.reset();
-        eventHandlersPtr_.reset();
-    });
-    addChanel(eventChanelPtr_.get());
-}
-
-void PollerSelect::loop_once(int interMs) {
+void PollerSelect::loop_once() {
+    struct timeval *pto = nullptr;
+#ifdef __APPLE__
     struct timeval timeout;
-    struct timeval *pto;
-    if (interMs >= 0) {
-        timeout.tv_sec = interMs / 1000;
-        interMs %= 1000;
-        timeout.tv_usec = interMs * 1000;
+    Timestamp min = getMinTimestamp();
+    if (!min.invalid()) {
+        Timestamp now = Timestamp::now();
+        if (min < now) {
+            timeout = {0, 0};
+        } else {
+            Timestamp inter = min - now;
+            timeout = {.tv_sec = min.sec(), .tv_usec = min.usec()};
+        }
         pto = &timeout;
-    } else {
-        pto = nullptr;
     }
+#endif
 
     fd_set rset = rset_;
     fd_set wset = wset_;
 
     int ready = ::select(maxfd_, &rset, &wset, NULL, pto);
     errorif(ready == -1, "select: %s\n", ::strerror(errno));
+
+#ifdef __APPLE__
+    // select will return zero when timeout expires
+    handleTimeoutEvents();
+#endif
 
     for (int fd = 0; fd < maxfd_ && ready > 0; fd++) {
         bool flag = false;
@@ -301,69 +291,30 @@ void PollerSelect::removeChanel(Chanel *chan) {
     }
 }
 
-void PollerSelect::runEventHandler(BasicHandler handler) {
-    if (eventChanelPtr_ && eventfd_ >= 0) {
-        eventHandlersPtr_->push_back(handler);
-        wakeup();
-    } else {
-        error("Cannot run EventHandler");
-    }
-}
+PollerPoll::PollerPoll() { pollfds_.resize(defaultPollSize); }
 
-void PollerSelect::wakeup() {
-    static int64_t this_is_a_number = 1;
-#ifdef __linux__
-    eventfp_->write(&this_is_a_number, sizeof(this_is_a_number));
-#elif defined(__APPLE__)
-    eventfp2_->write(&this_is_a_number, sizeof(this_is_a_number));
-#endif
-}
+void PollerPoll::loop_once() {
+    int interMs = -1;
 
-PollerPoll::PollerPoll() {
-#ifdef __linux__
-    eventfd_ = ::eventfd(1000, EFD_CLOEXEC | EFD_NONBLOCK);
-    // fatalif(eventfd_ <= 0, "%s", ::strerror(errno));
-    eventfp_ = std::make_shared<File>(eventfd_);
-#elif defined(__APPLE__)
-    int fildes[2];
-    ::pipe(fildes);
-    eventfd_ = fildes[0];
-    eventfp_ = std::make_shared<File>(eventfd_);
-    eventfd2_ = fildes[1];
-    eventfp2_ = std::make_shared<File>(eventfd2_);
-#endif
-
-    eventChanelPtr_ = std::make_shared<Chanel>(this, eventfp_);
-    eventHandlersPtr_ = std::make_shared<BlockingQueue<BasicHandler>>();
-
-    pollfds_.resize(defaultPollSize);
-    initEventfd();
-}
-
-void PollerPoll::initEventfd() {
-    eventChanelPtr_->enableRead();
-    eventChanelPtr_->setReadEventCallback([this] {
-        if (!eventfp_)
-            return;
-        char buf[128];
-        int ret = eventfp_->read(buf, 128);
-        if (ret <= 0)
-            return;
-
-        while (!eventHandlersPtr_->empty()) {
-            auto f_ = eventHandlersPtr_->pop_front();
-            f_();
+#ifdef __APPLE__
+    Timestamp min = getMinTimestamp();
+    if (!min.invalid()) {
+        Timestamp now = Timestamp::now();
+        if (min < now) {
+            interMs = 0;
+        } else {
+            Timestamp inter = min - now;
+            interMs = static_cast<int>(inter.toMillSec());
         }
-    });
-    eventChanelPtr_->setErroEventCallback([this] {
-        eventChanelPtr_.reset();
-        eventHandlersPtr_.reset();
-    });
-    addChanel(eventChanelPtr_.get());
-}
-
-void PollerPoll::loop_once(int interMs) {
+    }
+#endif
     int ready = ::poll(getPollfdPtr(), pollfds_.size(), interMs);
+
+#ifdef __APPLE__
+    // poll return zero when interMs expires
+    handleTimeoutEvents();
+#endif
+
     for (int i = 0; i < pollfds_.size() && ready > 0; i++) {
         int event = 0;
         int fd = pollfds_[i].fd;
@@ -457,69 +408,18 @@ void PollerPoll::removeChanel(Chanel *chan) {
     pollfds_[fd].fd = -1;
 }
 
-void PollerPoll::runEventHandler(BasicHandler handler) {
-    if (eventChanelPtr_ && eventfd_ >= 0) {
-        eventHandlersPtr_->push_back(handler);
-        wakeup();
-    } else {
-        error("Cannot run EventHandler");
-    }
-}
-
-void PollerPoll::wakeup() {
-    static int64_t this_is_a_number = 1;
-#ifdef __linux__
-    eventfp_->write(&this_is_a_number, sizeof(this_is_a_number));
-#elif defined(__APPLE__)
-    eventfp2_->write(&this_is_a_number, sizeof(this_is_a_number));
-#endif
-}
-
 PollerKevent::PollerKevent() {
 #ifdef __APPLE__
-    int fildes[2];
-    ::pipe(fildes);
-    eventfd_ = fildes[0];
-    eventfp_ = std::make_shared<File>(eventfd_);
-    eventfd2_ = fildes[1];
-    eventfp2_ = std::make_shared<File>(eventfd2_);
-
-    eventChanelPtr_ = std::make_shared<Chanel>(this, eventfp_);
-    eventHandlersPtr_ = std::make_shared<BlockingQueue<BasicHandler>>();
 
     kq_ = kqueue();
     keventPtr_ = std::make_shared<File>(kq_);
 
     events_.resize(48);
     changes_.reserve(48);
-
-    initEventfd();
 #endif
 }
 
 #ifdef __APPLE__
-void PollerKevent::initEventfd() {
-    eventChanelPtr_->enableRead();
-    eventChanelPtr_->setReadEventCallback([this] {
-        if (!eventfp_)
-            return;
-        char buf[128];
-        int ret = eventfp_->read(buf, 128);
-        if (ret <= 0)
-            return;
-
-        while (!eventHandlersPtr_->empty()) {
-            auto f_ = eventHandlersPtr_->pop_front();
-            f_();
-        }
-    });
-    eventChanelPtr_->setErroEventCallback([this] {
-        eventChanelPtr_.reset();
-        eventHandlersPtr_.reset();
-    });
-    addChanel(eventChanelPtr_.get());
-}
-
 void PollerKevent::updateKevents() {
     if (!changes_.empty()) {
         ::kevent(kq_, &changes_[0], changes_.size(), NULL, 0, NULL);
@@ -585,14 +485,26 @@ void PollerKevent::updateChanel(Chanel *ch) {
 #endif
 }
 
-void PollerKevent::loop_once(int interMs) {
+void PollerKevent::loop_once() {
 #ifdef __APPLE__
-    struct timespec timeout = {interMs / 1000, (interMs % 1000) * 1000000};
-    struct timespec *ptimeout = NULL;
-    if (interMs != -1) {
+    struct timespec timeout;
+    struct timespec *ptimeout = nullptr;
+    Timestamp min = getMinTimestamp();
+    Timestamp now = Timestamp::now();
+    if (!(min < now)) {
+        Timestamp inter = min - now;
+        timeout = {.tv_sec = inter.sec(), .tv_nsec = inter.usec() * 1000};
         ptimeout = &timeout;
     }
+
+    if (ptimeout)
+        debug("timeout: sec = %lu, nsec = %lu", ptimeout->tv_sec,
+              ptimeout->tv_nsec);
+
     int ready = ::kevent(kq_, NULL, 0, &events_[0], events_.size(), ptimeout);
+
+    handleTimeoutEvents();
+
     for (int i = 0; i < ready; i++) {
         struct kevent &ke = events_[i];
         Chanel *chan = reinterpret_cast<Chanel *>(ke.udata);
@@ -615,23 +527,5 @@ void PollerKevent::loop_once(int interMs) {
     if (eventsSize_ > events_.size()) {
         events_.resize(eventsSize_ * 2);
     }
-#endif
-}
-
-void PollerKevent::runEventHandler(BasicHandler handler) {
-#ifdef __APPLE__
-    if (eventChanelPtr_ && eventfd_ >= 0) {
-        eventHandlersPtr_->push_back(handler);
-        wakeup();
-    } else {
-        error("Cannot run EventHandler");
-    }
-#endif
-}
-
-void PollerKevent::wakeup() {
-#ifdef __APPLE__
-    static int64_t this_is_a_number = 1;
-    eventfp2_->write(&this_is_a_number, sizeof(this_is_a_number));
 #endif
 }

@@ -33,7 +33,7 @@ void Logger::log(LogLevel level, const char *file, const int line,
     char *buf = buffer;
 
     offset += snprintf(buf + offset, buffersize - offset,
-                       "[%s] [%s]: %s: %d %s", Logger::getLevelString(level),
+                       "[%s] [%s]: %s: %d %s ", Logger::getLevelString(level),
                        Timestamp::now().toString().c_str(), file, line, func);
 
     va_list args;

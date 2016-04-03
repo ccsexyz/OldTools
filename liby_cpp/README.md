@@ -37,3 +37,15 @@ int main() {
         return false;
     });
 ```
+###设置定时器
+```c++
+    // 指定绝对时刻
+    conn->runAt(Timestamp(sec, usec), []{});
+    // 指定相对时间
+    conn->runAfter(Timestamp(sec, usec), []{});
+    // 指定循环触发的定时器
+    conn->runEvery(Timestamp(sec, usec), []{});
+    // 取消定时器
+    // 与conn绑定的定时器在conn析构或调用destroy时自动取消
+    conn->cancelTimer(timerId);
+```

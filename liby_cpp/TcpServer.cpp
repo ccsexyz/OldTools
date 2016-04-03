@@ -1,4 +1,5 @@
 #include "TcpServer.h"
+#include "Chanel.h"
 #include "Connection.h"
 #include "EventLoop.h"
 #include "File.h"
@@ -65,6 +66,7 @@ void TcpServer::handleErroEventOfConn(std::shared_ptr<Connection> &&connPtr) {
         erroEventCallback_(std::move(connPtr));
     }
     closeConn(connPtr);
+    connPtr->destroy();
 }
 
 void TcpServer::closeConn(std::shared_ptr<Connection> connPtr) {

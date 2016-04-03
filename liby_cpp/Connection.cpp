@@ -88,6 +88,7 @@ void Connection::destroy() {
     chan_.reset();
     readBuf_.reset();
     writBuf_.reset();
+    cancelAllTimer();
     readEventCallback_ = nullptr;
     writeAllCallback_ = nullptr;
     errnoEventCallback_ = nullptr;
@@ -140,4 +141,37 @@ void Connection::suspendWrit(bool flag) {
         chan_->enableWrit(true);
     }
     chan_->updateChanel();
+}
+
+TimerId Connection::runAt(const Timestamp &timestamp,
+                          const BasicHandler &handler) {
+    TimerId id = poller_->runAt(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
+}
+
+TimerId Connection::runAfter(const Timestamp &timestamp,
+                             const BasicHandler &handler) {
+    TimerId id = poller_->runAfter(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
+}
+
+TimerId Connection::runEvery(const Timestamp &timestamp,
+                             const BasicHandler &handler) {
+    TimerId id = poller_->runEvery(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
+}
+
+void Connection::cancelAllTimer() {
+    for (auto &x : timerIds_) {
+        poller_->cancelTimer(x);
+    }
+    timerIds_.clear();
+}
+
+void Connection::cancelTimer(TimerId id) {
+    timerIds_.erase(id);
+    poller_->cancelTimer(id);
 }

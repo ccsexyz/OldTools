@@ -34,6 +34,15 @@ private:
     std::function<void()> functor_;
 };
 
+class ErrnoSaver final : clean_ {
+public:
+    ErrnoSaver() : savedErrno_(errno) {}
+    ~ErrnoSaver() { errno = savedErrno_; }
+
+private:
+    int savedErrno_ = 0;
+};
+
 class ExitCaller final : clean_ {
 public:
     static ExitCaller &getCaller();
@@ -178,7 +187,17 @@ inline bool operator>(const Timestamp &lhs, const Timestamp &rhs) {
 }
 
 inline Timestamp operator-(const Timestamp &lhs, const Timestamp &rhs) {
-    return Timestamp(lhs.sec() - rhs.sec(), lhs.usec() - rhs.usec());
+    auto sec = lhs.sec() - rhs.sec();
+    auto lusec = lhs.usec();
+    auto rusec = rhs.usec();
+
+    if (lusec < rusec) {
+        sec--;
+        lusec += Timestamp::kMicrosecondsPerSecond;
+    }
+    lusec -= rusec;
+
+    return Timestamp(sec, lusec);
 }
 
 inline Timestamp operator+(const Timestamp &lhs, const Timestamp &rhs) {

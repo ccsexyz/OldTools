@@ -10,12 +10,12 @@
 #ifdef OS_LINUX
 #include <sys/eventfd.h>
 #endif
+#include "util.h"
 #include <sys/fcntl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
-#include "util.h"
 
 #define QLEN (10)
 
@@ -86,9 +86,7 @@ static int initserver(const char *server_path, const char *bind_port) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(err));
         return -1;
     }
-    DeferCaller defer([ailist]{
-        ::freeaddrinfo(ailist);
-    });
+    DeferCaller defer([ailist] { ::freeaddrinfo(ailist); });
     for (aip = ailist; aip != NULL; aip = aip->ai_next) {
         if ((sockfd = initsocket(SOCK_STREAM, aip->ai_addr, aip->ai_addrlen,
                                  QLEN)) >= 0) {
@@ -112,11 +110,9 @@ static int connect_tcp(const char *host, const char *port, int is_noblock) {
     hints.ai_socktype = SOCK_STREAM;
 
     if (::getaddrinfo(host, port, &hints, &res) == -1)
-        goto errout;
+        return -1;
 
-    DeferCaller defer([res]{
-        ::freeaddrinfo(res);
-    });
+    DeferCaller defer([res] { ::freeaddrinfo(res); });
 
     int sockfd;
     if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) ==

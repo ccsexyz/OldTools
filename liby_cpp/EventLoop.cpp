@@ -51,6 +51,8 @@ void EventLoop::RunMainLoop(std::function<bool()> cb) {
 
 void EventLoop::worker_thread(int index) {
     assert(index >= 0 && index < pollers_.size());
+
+    pollers_[index]->init();
     while (insistFunctor_()) {
         pollers_[index]->loop_once();
     }

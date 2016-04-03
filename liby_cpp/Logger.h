@@ -17,9 +17,11 @@
     Liby::Logger::getLogger().log(Logger::LogLevel::ERROR, __FILE__, __LINE__, \
                                   __func__, fmt, ##__VA_ARGS__)
 #define fatal(fmt, ...)                                                        \
-    Liby::Logger::getLogger().log(Logger::LogLevel::FATAL, __FILE__, __LINE__, \
-                                  __func__, fmt, ##__VA_ARGS__);               \
-    ::exit(1)
+    do {                                                                       \
+        Liby::Logger::getLogger().log(Logger::LogLevel::FATAL, __FILE__,       \
+                                      __LINE__, __func__, fmt, ##__VA_ARGS__); \
+        ::exit(1);                                                             \
+    } while (0)
 #define debugif(condition, ...)                                                \
     do {                                                                       \
         if ((condition))                                                       \
@@ -42,8 +44,9 @@
     } while (0)
 #define fatalif(condition, ...)                                                \
     do {                                                                       \
-        if ((condition))                                                       \
+        if ((condition)) {                                                     \
             fatal(__VA_ARGS__);                                                \
+        }                                                                      \
     } while (0)
 
 namespace Liby {
