@@ -3,6 +3,8 @@
 
 using namespace Liby;
 
+Chanel::~Chanel() { removeChanel(); }
+
 void Chanel::handleEvent() {
     if (isError()) {
         if (erroEventCallback_) {
@@ -26,8 +28,11 @@ void Chanel::handleEvent() {
 }
 
 void Chanel::removeChanel() {
-    assert(poller_);
-    poller_->removeChanel(this);
+    // 这里不对poller_作断言
+    //　这是为了解决Poller中的TimerQueue和EventQueue在析构时会间接调用纯虚函数的问题
+    //　如果不这样解决，我能想到的办法就只有将这两个类移出Poller虚基类,这样会导致一定的代码膨胀的问题
+    if (poller_)
+        poller_->removeChanel(this);
 }
 
 void Chanel::updateChanel() {

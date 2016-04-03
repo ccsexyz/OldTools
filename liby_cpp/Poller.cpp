@@ -239,7 +239,7 @@ void PollerSelect::addChanel(Chanel *chan) {
 
     if (fd >= maxfd_) {
         maxfd_ = fd + 1;
-        if (maxfd_ > chanels_.size())
+        if (static_cast<decltype(chanels_.size())>(maxfd_) > chanels_.size())
             chanels_.resize(maxfd_);
     }
     chanels_[fd] = chan;
@@ -315,7 +315,7 @@ void PollerPoll::loop_once() {
     handleTimeoutEvents();
 #endif
 
-    for (int i = 0; i < pollfds_.size() && ready > 0; i++) {
+    for (uint32_t i = 0; i < pollfds_.size() && ready > 0; i++) {
         int event = 0;
         int fd = pollfds_[i].fd;
         int revent = pollfds_[i].revents;
@@ -366,7 +366,7 @@ void PollerPoll::addChanel(Chanel *chan) {
     if (event & Chanel::kWrit_)
         pollfd_.events |= POLLOUT;
 
-    if (pollfds_.size() <= fd) {
+    if (pollfds_.size() <= static_cast<decltype(pollfds_.size())>(fd)) {
         pollfds_.resize(fd + 1);
     }
     pollfds_[fd] = pollfd_;

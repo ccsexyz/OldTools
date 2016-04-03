@@ -28,6 +28,13 @@ EventQueue::EventQueue(Poller *poller) : poller_(poller) {
     eventHandlersPtr_ = std::make_unique<BlockingQueue<BasicHandler>>();
 }
 
+EventQueue::~EventQueue() {
+    //　使eventChanelPtr_析构时不去调用Poller基类的虚函数
+    if (eventChanelPtr_) {
+        eventChanelPtr_->setPoller(nullptr);
+    }
+}
+
 void EventQueue::destroy() {
     eventfd_ = -1;
     eventfp_.reset();

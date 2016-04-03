@@ -46,7 +46,9 @@ void Logger::log(LogLevel level, const char *file, const int line,
     buf[++offset] = '\n';
     buf[++offset] = '\0';
 
-    ::write(STDERR_FILENO, buf, ::strlen(buf));
+    int ret = ::write(STDERR_FILENO, buf, ::strlen(buf));
+    // avoid the "variable set but not use" warning
+    (void)ret;
 
     //    queue_.push_notify(std::string(buf));
 }

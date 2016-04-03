@@ -81,7 +81,7 @@ private:
 
 private:
     int pollerfd_ = -1;
-    int eventsSize_ = 0;
+    size_t eventsSize_ = 0;
     std::shared_ptr<File> pollerfp_;
     std::vector<struct epoll_event> events_;
 #endif

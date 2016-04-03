@@ -5,10 +5,10 @@
 #ifndef POLLERTEST_BINARYHEAP_H
 #define POLLERTEST_BINARYHEAP_H
 
+#include <functional>
 #include <initializer_list>
 #include <stdint.h>
 #include <vector>
-#include <functional>
 
 namespace Liby {
 template <typename T> class BinaryHeap {
@@ -56,7 +56,7 @@ public:
     void erase_if(std::function<bool(const_reference_type)> f_) {
         if (empty())
             throw;
-        int i = 1;
+        uint32_t i = 1;
         for (; i < size_ + 1; i++) {
             if (f_(heap[i])) {
                 break;

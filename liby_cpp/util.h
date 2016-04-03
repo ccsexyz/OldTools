@@ -212,9 +212,10 @@ public:
 
 class BaseException {
 public:
+    BaseException() = delete;
     BaseException(const std::string &filename, int linenumber,
                   const std::string errmsg)
-        : filename_(filename), linenumber_(linenumber), errmsg_(errmsg) {}
+        : linenumber_(linenumber), filename_(filename), errmsg_(errmsg) {}
     virtual ~BaseException() = default;
     std::string what() {
         return filename_ + std::to_string(linenumber_) + errmsg_;

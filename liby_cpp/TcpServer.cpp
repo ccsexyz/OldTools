@@ -43,7 +43,8 @@ void TcpServer::handleAcceptEvent() {
         initConnection(connPtr);
         connPtr->runEventHandler([this, connPtr] {
             connPtr->init();
-            acceptorCallback_(connPtr);
+            if (acceptorCallback_)
+                acceptorCallback_(connPtr);
         });
     }
 }

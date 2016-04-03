@@ -76,8 +76,7 @@ errout:
 static int initserver(const char *server_path, const char *bind_port) {
     struct addrinfo *ailist, *aip;
     struct addrinfo hint;
-    int sockfd, err, n;
-    char *host;
+    int sockfd, err;
 
     ::memset(&hint, 0, sizeof(hint));
     hint.ai_flags = AI_PASSIVE;
@@ -104,13 +103,16 @@ FilePtr File::initserver(const std::string &server_path,
 }
 
 static int connect_tcp(const char *host, const char *port, int is_noblock) {
+    int ret;
     struct addrinfo hints, *res;
     ::bzero((void *)(&hints), sizeof(hints));
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if (::getaddrinfo(host, port, &hints, &res) == -1)
+    if ((ret = ::getaddrinfo(host, port, &hints, &res)) != 0) {
+        fatal("getaddrinfo error: %s", ::gai_strerror(ret));
         return -1;
+    }
 
     DeferCaller defer([res] { ::freeaddrinfo(res); });
 
@@ -123,7 +125,6 @@ static int connect_tcp(const char *host, const char *port, int is_noblock) {
         set_noblock(sockfd, true);
     }
 
-    int ret;
     ret = connect(sockfd, res->ai_addr, res->ai_addrlen);
     if (ret < 0 && errno != EINPROGRESS) {
         error("connect error: %s\n", ::strerror(errno));
@@ -187,7 +188,7 @@ ssize_t File::read(Buffer &buffer) {
     iov[1].iov_len = sizeof(extraBuffer);
     int ret = ::readv(fd_, iov, 2);
     if (ret > 0) {
-        if (ret > iov[0].iov_len) {
+        if (static_cast<decltype(iov[0].iov_len)>(ret) > iov[0].iov_len) {
             buffer.append(iov[0].iov_len);
             buffer.append(extraBuffer, ret - iov[0].iov_len);
         } else {

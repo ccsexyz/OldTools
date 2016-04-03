@@ -14,9 +14,9 @@ using TimerId = uint64_t;
 
 class Timer {
 public:
-    Timer() : timeout_(), handler_(), id_(0) {}
+    Timer() : id_(0), timeout_(), handler_() {}
     Timer(const Timestamp &timeout, const BasicHandler &handler)
-        : timeout_(timeout), handler_(handler), id_(timerIds_++) {}
+        : id_(timerIds_++), timeout_(timeout), handler_(handler) {}
     Timer(TimerId id, const Timestamp &timeout, const BasicHandler &handler)
         : id_(id), timeout_(timeout), handler_(handler) {}
     static TimerId getOneValidId() { return timerIds_++; }
@@ -39,6 +39,7 @@ inline bool operator<(const Timer &lhs, const Timer &rhs) {
 class TimerQueue : clean_ {
 public:
     TimerQueue(Poller *poller);
+    ~TimerQueue();
 
     void start();
     Poller *getPoller() const { return poller_; }

@@ -14,8 +14,8 @@ public:
     static const int kErro_ = 0x4;
 
     Chanel() = default;
-    Chanel(Poller *poller, FilePtr fp) : poller_(poller), fp_(fp) {}
-    ~Chanel() { removeChanel(); }
+    Chanel(Poller *poller, FilePtr fp) : fp_(fp), poller_(poller) {}
+    ~Chanel();
 
     void updateRevents(int revents) { revents_ = revents; }
     void setEvents(int events) { events_ = events; }

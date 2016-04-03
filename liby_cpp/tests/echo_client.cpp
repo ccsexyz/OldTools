@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     vector<char> buf(msg_len, 'A');
     vector<unsigned long> bytes(concurrency, 0);
 
-    EventLoop loop(8, EventLoop::PollerChooser::EPOLL);
+    EventLoop loop(4, EventLoop::PollerChooser::EPOLL);
     map<TcpClient *, shared_ptr<TcpClient>> clients;
 
     auto start = Timestamp::now();

@@ -3,7 +3,7 @@
 ###基本用法
 
 ```c++
-#include "../Liby.h"
+#include "Liby.h"
 
 using namespace Liby;
 
@@ -18,7 +18,7 @@ int main() {
 }
 ```
 
-####设置工作线程数和IO服用借口
+####设置工作线程数和IO复用接口
 ```c++
     EventLoop loop(8, EventLoop::PollerChooser::POLL);
 ```

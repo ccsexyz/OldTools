@@ -6,6 +6,12 @@
 
 using namespace Liby;
 
+std::map<std::string, EventLoop::PollerChooser> EventLoop::ChooserStrings = {
+    {"EPOLL", PollerChooser::EPOLL},
+    {"POLL", PollerChooser::POLL},
+    {"SELECT", PollerChooser::SELECT},
+    {"KQUEUE", PollerChooser::KQUEUE}};
+
 EventLoop::EventLoop(int n, PollerChooser chooser) : N(n), chooser_(chooser) {
     pollers_.reserve(N + 1);
     pollers_.emplace_back(newPoller());
@@ -24,16 +30,17 @@ std::shared_ptr<Poller> EventLoop::newPoller() {
     switch (chooser_) {
     case PollerChooser::EPOLL:
     case PollerChooser::KQUEUE:
-#ifdef __linux__
-        return std::make_shared<PollerEpoll>();
-#elif defined(__APPLE__)
-        return std::make_shared<PollerKevent>();
-#endif
+        break;
     case PollerChooser::POLL:
         return std::make_shared<PollerPoll>();
     case PollerChooser::SELECT:
         return std::make_shared<PollerSelect>();
     }
+#ifdef __linux__
+    return std::make_shared<PollerEpoll>();
+#elif defined(__APPLE__)
+    return std::make_shared<PollerKevent>();
+#endif
 }
 
 void EventLoop::RunMainLoop(std::function<bool()> cb) {
@@ -50,7 +57,8 @@ void EventLoop::RunMainLoop(std::function<bool()> cb) {
 }
 
 void EventLoop::worker_thread(int index) {
-    assert(index >= 0 && index < pollers_.size());
+    assert(index >= 0 &&
+           static_cast<decltype(pollers_.size())>(index) < pollers_.size());
 
     pollers_[index]->init();
     while (insistFunctor_()) {

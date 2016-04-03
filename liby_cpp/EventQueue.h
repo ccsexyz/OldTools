@@ -12,6 +12,7 @@ class Poller;
 class EventQueue : clean_ {
 public:
     EventQueue(Poller *poller);
+    ~EventQueue();
     void setPoller(Poller *poller);
     void start();
     void destroy();

@@ -24,6 +24,13 @@ TimerQueue::TimerQueue(Poller *poller) : poller_(poller) {
 #endif
 }
 
+TimerQueue::~TimerQueue() {
+    //　使timerChan_析构时不去调用Poller虚基类的虚函数
+    if (timerChan_) {
+        timerChan_->setPoller(nullptr);
+    }
+}
+
 void TimerQueue::updateTimerfd(const Timestamp &timeout) {
 #ifdef __linux
     struct itimerspec new_timer;

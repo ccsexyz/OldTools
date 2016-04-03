@@ -2,6 +2,7 @@
 #define POLLERTEST_EVENTLOOP_H
 
 #include "util.h"
+#include <map>
 #include <thread>
 #include <vector>
 
@@ -17,10 +18,14 @@ class EventLoop final : clean_ {
 public:
     enum class PollerChooser { EPOLL, POLL, SELECT, KQUEUE };
 
+    static std::map<std::string, EventLoop::PollerChooser> ChooserStrings;
+
     // n的意义为工作线程数,总线程数为n + 1,每个线程一个事件驱动循环,默认为单线程
     // 其中第一个线程有特殊意义,负责服务器端接收连接和运行不需要立即执行的临界区代码
 
-    explicit EventLoop(int n = 0, PollerChooser chooser = PollerChooser::EPOLL);
+    EventLoop(int n = 0, PollerChooser chooser = PollerChooser::EPOLL);
+    EventLoop(int n, const std::string &chooserString)
+        : EventLoop(n, ChooserStrings[chooserString]) {}
     ~EventLoop();
     void RunMainLoop(std::function<bool()> cb = [] { return true; });
     std::shared_ptr<Poller> &getSuitablePoller(int fd);
