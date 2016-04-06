@@ -6,7 +6,34 @@
 #include <assert.h>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <sys/time.h>
+#include <type_traits>
+#include <utility>
+
+#if __cplusplus < 201402L
+
+namespace std {
+template <typename T, typename... Args>
+inline typename enable_if<!is_array<T>::value, unique_ptr<T>>::type
+make_unique(Args &&... args) {
+    return unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+template <typename T>
+inline typename enable_if<is_array<T>::value && extent<T>::value == 0,
+                          unique_ptr<T>>::type
+make_unique(size_t size) {
+    using U = typename remove_extent<T>::type;
+    return unique_ptr<T>(new U[size]());
+}
+
+template <typename T, typename... Args>
+typename enable_if<extent<T>::value != 0, void>::type
+make_unique(Args &&...) = delete;
+}
+
+#endif
 
 using BasicHandler = std::function<void()>;
 
@@ -213,12 +240,17 @@ public:
 class BaseException {
 public:
     BaseException() = delete;
+    BaseException(const std::string errmsg)
+        : linenumber_(-1), errmsg_(errmsg) {}
     BaseException(const std::string &filename, int linenumber,
                   const std::string errmsg)
         : linenumber_(linenumber), filename_(filename), errmsg_(errmsg) {}
     virtual ~BaseException() = default;
-    std::string what() {
-        return filename_ + std::to_string(linenumber_) + errmsg_;
+    std::string what() const {
+        if (linenumber_ >= 0)
+            return filename_ + std::to_string(linenumber_) + errmsg_;
+        else
+            return errmsg_;
     }
 
 private:
@@ -226,5 +258,8 @@ private:
     std::string filename_;
     std::string errmsg_;
 };
+
+template <typename T> void ClearUnuseVariableWarning(T &&) { /*do nothing*/
+}
 
 #endif // LIBY_UTIL_H

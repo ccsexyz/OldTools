@@ -12,7 +12,7 @@ int main(void) {
     chat_server->setAcceptorCallback(
         [](std::shared_ptr<Connection> conn) { conn->suspendRead(false); });
     chat_server->setReadEventCallback(
-        [&chat_server](std::shared_ptr<Connection> &&conn) {
+        [&chat_server](std::shared_ptr<Connection> conn) {
             Buffer buf(conn->read().retriveveAllAsString());
             chat_server->runHanlderOnConns(
                 [buf, conn](std::shared_ptr<Connection> conn2) {
@@ -21,8 +21,6 @@ int main(void) {
                     }
                 });
         });
-    chat_server->setWriteAllCallback(
-        [](std::shared_ptr<Connection> &&conn) { conn->suspendRead(false); });
     chat_server->start();
 
     auto daytime_server = loop.creatTcpServer("localhost", "9390");
@@ -31,19 +29,16 @@ int main(void) {
         conn->send(Buffer(Timestamp::now().toString()));
         conn->send('\n');
     });
-    daytime_server->setWriteAllCallback(
-        [&daytime_server](std::shared_ptr<Connection> &&conn) {
-            daytime_server->closeConn(conn);
-        });
+    daytime_server->setWriteAllCallback([&daytime_server](
+        std::shared_ptr<Connection> conn) { daytime_server->closeConn(conn); });
     daytime_server->start();
 
     auto discard_server = loop.creatTcpServer("localhost", "9378");
     discard_server->setAcceptorCallback(
         [](std::shared_ptr<Connection> conn) { conn->suspendRead(false); });
-    discard_server->setReadEventCallback(
-        [](std::shared_ptr<Connection> &&conn) {
-            info(conn->read().retriveveAllAsString().c_str());
-        });
+    discard_server->setReadEventCallback([](std::shared_ptr<Connection> conn) {
+        info(conn->read().retriveveAllAsString().c_str());
+    });
     discard_server->start();
 
     auto echo_server = loop.creatTcpServer("localhost", "9377");
@@ -51,20 +46,12 @@ int main(void) {
     echo_server->setAcceptorCallback(
         [&timerIds](std::shared_ptr<Connection> conn) {
             conn->suspendRead(false);
-            auto id = conn->runEvery(Timestamp(2, 0),
-                                     [conn] { conn->send("Time is money\n"); });
-            //            TimerId id = conn->runAfter(Timestamp(4, 0), [conn]{
-            //                conn->destroy();
-            //            });
-            //            info("id0 = %lu id = %lu\n", id0, id);
+            conn->runEvery(Timestamp(2, 0),
+                           [conn] { conn->send("Time is money\n"); });
         });
-    echo_server->setReadEventCallback(
-        [&timerIds](std::shared_ptr<Connection> &&conn) {
-            conn->send(conn->read());
-            conn->suspendRead();
-        });
-    echo_server->setWriteAllCallback(
-        [](std::shared_ptr<Connection> &&conn) { conn->suspendRead(false); });
+    echo_server->setReadEventCallback([&timerIds](
+        std::shared_ptr<Connection> conn) { conn->send(conn->read()); });
+    ;
     echo_server->start();
 
     loop.RunMainLoop();

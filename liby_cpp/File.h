@@ -44,6 +44,7 @@ public:
     std::vector<FilePtr> accept();
 
     int getErrno() const { return savedErrno_; }
+    int checkSocketError();
 
 private:
     void tryCloseFd() const;

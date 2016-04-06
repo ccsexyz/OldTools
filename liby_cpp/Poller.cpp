@@ -92,9 +92,10 @@ PollerEpoll::PollerEpoll() {
 void PollerEpoll::loop_once() {
 #ifdef __linux__
     int nfds = ::epoll_wait(pollerfd_, getEventsPtr(), events_.size(), -1);
+    debug("nfds = %d events_.size() = %u", nfds, events_.size());
     for (int i = 0; i < nfds; i++) {
         Chanel *ch = reinterpret_cast<Chanel *>(events_[i].data.ptr);
-        debug("event in chan %p", ch);
+        // debug("event in chan %p", ch);
         if (ch == NULL)
             continue;
         int revent = 0;
@@ -165,6 +166,10 @@ void PollerEpoll::updateChanel(Chanel *chan) {
 #ifdef __linux__
     assert(chan && chan->getChanelFd() >= 0);
 
+    if (!chan->isEventsChanged()) {
+        return;
+    }
+
     struct epoll_event event;
     translateEvents(event, chan);
 
@@ -193,6 +198,7 @@ void PollerSelect::loop_once() {
             timeout = {0, 0};
         } else {
             Timestamp inter = min - now;
+            ClearUnuseVariableWarning(inter);
             timeout = {.tv_sec = min.sec(), .tv_usec = min.usec()};
         }
         pto = &timeout;
@@ -222,6 +228,7 @@ void PollerSelect::loop_once() {
             revent |= Chanel::kWrit_;
         }
         if (flag) {
+            debug("loop onct in fd %d chanel %p", fd, chanels_[fd]);
             ready--;
             chanels_[fd]->updateRevents(revent);
             chanels_[fd]->handleEvent();
@@ -236,6 +243,8 @@ void PollerSelect::addChanel(Chanel *chan) {
     if (fd >= FD_SETSIZE) {
         throw BaseException(__FILE__, __LINE__, "fd >= 1024");
     }
+
+    debug("try to add fd %d chanel %p", fd, chan);
 
     if (fd >= maxfd_) {
         maxfd_ = fd + 1;
@@ -260,6 +269,8 @@ void PollerSelect::updateChanel(Chanel *chanel) {
         return;
     }
 
+    debug("update chanel for %p", chanel);
+
     auto fd = chanel->getChanelFd();
     auto event = chanel->getEvents();
     if ((event & Chanel::kRead_) && (!FD_ISSET(fd, &rset_))) {
@@ -282,6 +293,8 @@ void PollerSelect::removeChanel(Chanel *chan) {
     auto fd = chan->getChanelFd();
     FD_CLR(fd, &rset_);
     FD_CLR(fd, &wset_);
+
+    debug("try to remove fd %d chan %p", fd, chan);
 
     if (fd == maxfd_) {
         while (--maxfd_) {
@@ -376,6 +389,10 @@ void PollerPoll::addChanel(Chanel *chan) {
 void PollerPoll::updateChanel(Chanel *chan) {
     assert(chan && chan->getChanelFd() >= 0);
 
+    if (!chan->isEventsChanged()) {
+        return;
+    }
+
     int fd = chan->getChanelFd();
     int event = chan->getEvents();
     struct pollfd *p = &pollfds_[fd];
@@ -432,6 +449,7 @@ void PollerKevent::updateKevents() {
 void PollerKevent::addChanel(Chanel *ch) {
 #ifdef __APPLE__
     assert(ch && ch->getChanelFd() >= 0);
+    debug("add chanel %p", ch);
     struct kevent changes;
     int events = ch->getEvents();
     if (events & Chanel::kRead_) {
@@ -453,19 +471,36 @@ void PollerKevent::removeChanel(Chanel *ch) {
 #ifdef __APPLE__
     assert(ch && ch->getChanelFd() >= 0);
 
+    debug("try to remove Chanel %p", ch);
+
     struct kevent changes;
     static int i = 0;
     i++;
     EV_SET(&changes, ch->getChanelFd(), EVFILT_READ, EV_DELETE, 0, 0, NULL);
     int k1 = ::kevent(kq_, &changes, 1, NULL, 0, NULL);
+    ClearUnuseVariableWarning(k1);
     EV_SET(&changes, ch->getChanelFd(), EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     int k2 = ::kevent(kq_, &changes, 1, NULL, 0, NULL);
+    ClearUnuseVariableWarning(k2);
     eventsSize_--;
+    changes_.erase(std::remove_if(changes_.begin(), changes_.end(),
+                                  [ch](struct kevent &ke) -> bool {
+                                      return ke.udata ==
+                                             static_cast<decltype(ke.udata)>(
+                                                 ch);
+                                  }),
+                   changes_.end());
 #endif
 }
 
 void PollerKevent::updateChanel(Chanel *ch) {
 #ifdef __APPLE__
+    if (!ch->isEventsChanged()) {
+        return;
+    }
+
+    debug("try to update %p", ch);
+
     struct kevent changes;
     int events = ch->getEvents();
     if (events & Chanel::kRead_) {
@@ -519,6 +554,7 @@ void PollerKevent::loop_once() {
             if (ke.filter == EVFILT_WRITE) {
                 events |= Chanel::kWrit_;
             }
+            debug("loop once in chanel %p", chan);
             chan->updateRevents(events);
             chan->handleEvent();
         }

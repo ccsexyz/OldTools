@@ -39,6 +39,9 @@ public:
 
     std::shared_ptr<TcpClient> creatTcpClient(const std::string &server_path,
                                               const std::string &server_port);
+    std::shared_ptr<TcpClient> creatTcpClient(Poller *poller,
+                                              const std::string &server_path,
+                                              const std::string &server_port);
 
 private:
     std::shared_ptr<Poller> newPoller();

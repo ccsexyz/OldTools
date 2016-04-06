@@ -51,8 +51,7 @@ void ExitCaller::callImp(const std::function<void()> &functor) {
 void ExitCaller::callOnExit() {
     std::lock_guard<std::mutex> G_(ExitCallerMutex);
     std::cout << __func__ << std::endl;
-    std::for_each(ExitCallerFunctors.begin(), ExitCallerFunctors.end(),
-                  [](const decltype(*ExitCallerFunctors.begin()) &functor) {
-                      functor();
-                  });
+    std::for_each(
+        ExitCallerFunctors.begin(), ExitCallerFunctors.end(),
+        [](decltype(*ExitCallerFunctors.begin()) &functor) { functor(); });
 }

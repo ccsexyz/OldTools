@@ -62,9 +62,9 @@ void TcpServer::initConnection(std::shared_ptr<Connection> &connPtr) {
     connPtr->setWritCallback(writeAllCallback_);
 }
 
-void TcpServer::handleErroEventOfConn(std::shared_ptr<Connection> &&connPtr) {
+void TcpServer::handleErroEventOfConn(std::shared_ptr<Connection> connPtr) {
     if (erroEventCallback_) {
-        erroEventCallback_(std::move(connPtr));
+        erroEventCallback_((connPtr));
     }
     closeConn(connPtr);
     connPtr->destroy();

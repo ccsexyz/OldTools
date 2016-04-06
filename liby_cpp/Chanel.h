@@ -24,28 +24,24 @@ public:
         assert(fp_->fd() >= 0);
         return fp_->fd();
     }
-    bool isEventsChanged() { return isEventsChanged_; }
+    bool isEventsChanged() { return events_ != savedEvents_; }
 
     FilePtr &filePtr() { return fp_; }
 
     void setPoller(Poller *poller) { poller_ = poller; }
     void setFilePtr(FilePtr fp) { fp_ = fp; }
     void enableRead(bool flag = true) {
-        if (flag ^ (events_ & kRead_)) {
-            isEventsChanged_ = true;
-            events_ = flag ? (events_ | kRead_) : (events_ & ~kRead_);
-        }
+        events_ = flag ? (events_ | kRead_) : (events_ & ~kRead_);
     }
     void enableWrit(bool flag = true) {
-        if (flag ^ (events_ & kWrit_)) {
-            isEventsChanged_ = true;
-            events_ = flag ? (events_ | kWrit_) : (events_ & ~kWrit_);
-        }
+        events_ = flag ? (events_ | kWrit_) : (events_ & ~kWrit_);
+    }
+    void enableErro(bool flag = true) {
+        events_ = flag ? (events_ | kErro_) : (events_ & ~kErro_);
     }
 
-    bool isError() const { return revents_ & kErro_; }
-    bool Readable() const { return revents_ & kRead_; }
-    bool Writable() const { return revents_ & kWrit_; }
+    bool canRead() const { return events_ & kRead_; }
+    bool canWrit() const { return events_ & kWrit_; }
 
     void removeChanel();
     void updateChanel();
@@ -64,15 +60,20 @@ public:
     void handleEvent();
 
 private:
+    bool isError() const { return revents_ & kErro_ || events_ & kErro_; }
+    bool Readable() const { return revents_ & kRead_; }
+    bool Writable() const { return revents_ & kWrit_; }
+
+private:
     BasicHandler readEventCallback_;
     BasicHandler writEventCallback_;
     BasicHandler erroEventCallback_;
 
     FilePtr fp_;
     Poller *poller_ = nullptr;
-    int events_ = 0;  // update by user
+    int events_ = 0; // update by user
+    int savedEvents_ = 0;
     int revents_ = 0; // update by poller
-    bool isEventsChanged_ = false;
 };
 using ChanelPtr = std::shared_ptr<Chanel>;
 }

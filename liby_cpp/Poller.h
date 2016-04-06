@@ -120,7 +120,7 @@ private:
     }
 
 private:
-    int eventsSize_ = 0;
+    // int eventsSize_ = 0;
     std::vector<struct pollfd> pollfds_;
     std::unordered_map<int, Chanel *> chanels_;
 };

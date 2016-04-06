@@ -67,6 +67,7 @@ public:
         }
         heap[i] = heap[size_--];
         percolate_down(i);
+        heap[size_ + 1] = T();
     }
 
     void delete_min() {
@@ -75,6 +76,7 @@ public:
 
         heap[1] = heap[size_--];
         percolate_down(1);
+        heap[size_ + 1] = T(); // 使删除小端后的堆的末尾的多余的一个元素被清零
     }
 
     void delete_min(reference_type x) {
@@ -82,6 +84,7 @@ public:
             throw;
 
         x = heap[1];
+        heap[1] = T();
         heap[1] = heap[size_--];
         percolate_down(1);
     }
@@ -108,10 +111,11 @@ private:
             child = hole * 2;
             if (child != size_ && heap[child + 1] < heap[child])
                 child++;
-            if (heap[child] < tmp)
+            if (heap[child] < tmp) {
                 heap[hole] = heap[child];
-            else
+            } else {
                 break;
+            }
         }
         heap[hole] = tmp;
     }

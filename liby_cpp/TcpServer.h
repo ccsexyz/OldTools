@@ -16,7 +16,7 @@ class Poller;
 class TcpServer final : clean_ {
 public:
     using AcceptorCallback = std::function<void(std::shared_ptr<Connection>)>;
-    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
     TcpServer(const std::string &server_path, const std::string server_port);
     void start();
 
@@ -40,7 +40,7 @@ private:
     void initConnection(std::shared_ptr<Connection> &connPtr);
     void handleAcceptEvent();
     void handleErroEvent();
-    void handleErroEventOfConn(std::shared_ptr<Connection> &&connPtr);
+    void handleErroEventOfConn(std::shared_ptr<Connection> connPtr);
 
 private:
     int listenfd_;

@@ -6,6 +6,7 @@ using namespace Liby;
 Chanel::~Chanel() { removeChanel(); }
 
 void Chanel::handleEvent() {
+    savedEvents_ = events_;
     if (isError()) {
         if (erroEventCallback_) {
             erroEventCallback_();
@@ -38,9 +39,11 @@ void Chanel::removeChanel() {
 void Chanel::updateChanel() {
     assert(poller_);
     poller_->updateChanel(this);
+    savedEvents_ = events_;
 }
 
 void Chanel::addChanel() {
     assert(poller_);
     poller_->addChanel(this);
+    savedEvents_ = events_;
 }

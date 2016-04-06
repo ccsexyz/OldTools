@@ -16,7 +16,8 @@ class Connection final : clean_,
                          public std::enable_shared_from_this<Connection> {
 public:
     using TimerId = uint64_t;
-    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    const size_t defaultWritableLimit = 16 * 4096;
+    using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
     Connection(Poller *poller, std::shared_ptr<File> &fp);
 
     void init();
@@ -31,6 +32,9 @@ public:
     void setReadCallback(ConnCallback cb);
     void setWritCallback(ConnCallback cb);
     void setErroCallback(ConnCallback cb);
+    void setWritLimitCallback(ConnCallback cb);
+
+    void setWritableLimit(size_t writableLimit);
 
     Poller *getPoller() const;
     int getConnfd() const;
@@ -45,14 +49,19 @@ public:
     void suspendWrit(bool flag = true);
 
     void destroy();
+    void setErro();
 
 private:
     void onRead();
     void onWrit();
     void onErro();
 
+public:
+    off_t writableLimit_ = defaultWritableLimit;
+    void *udata_ = nullptr;
+
 private:
-    Poller *poller_;
+    Poller *poller_ = nullptr;
     std::set<TimerId> timerIds_;
     std::unique_ptr<Chanel> chan_;
     std::unique_ptr<Buffer> readBuf_;
@@ -60,6 +69,7 @@ private:
     ConnCallback readEventCallback_;
     ConnCallback writeAllCallback_;
     ConnCallback errnoEventCallback_;
+    ConnCallback writableLimitCallback_;
 };
 }
 

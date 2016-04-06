@@ -9,11 +9,10 @@ void print_usage() {
     cerr << "usage: ./echo_client server_name server_port concurrency "
             "[active_clients] msg_num, msg_len"
          << endl;
-    ::exit(1);
 }
 
 int main(int argc, char **argv) {
-    Logger::setLevel(Logger::LogLevel::INFO);
+    // Logger::setLevel(Logger::LogLevel::DEBUG);
     int msg_num, msg_len, concurrency, active_clients;
     if (argc == 7) {
         msg_num = ::atoi(argv[5]);
@@ -26,6 +25,7 @@ int main(int argc, char **argv) {
         active_clients = concurrency = ::atoi(argv[3]);
     } else {
         print_usage();
+        return 1;
     }
     unsigned long bytesPerClients = msg_len * msg_num;
     unsigned long totalBytes = bytesPerClients * active_clients;
@@ -33,8 +33,7 @@ int main(int argc, char **argv) {
     vector<char> buf(msg_len, 'A');
     vector<unsigned long> bytes(concurrency, 0);
 
-    EventLoop loop(4, EventLoop::PollerChooser::EPOLL);
-    map<TcpClient *, shared_ptr<TcpClient>> clients;
+    EventLoop loop(0, "EPOLL");
 
     auto start = Timestamp::now();
     for (int i = 0; i < concurrency; i++) {
@@ -43,43 +42,35 @@ int main(int argc, char **argv) {
             unsigned long *pBytes = &bytes[i];
             auto echo_client_ = echo_client.get();
             echo_client->setConnectorCallback(
-                [&buf](std::shared_ptr<Connection> conn) {
-                    conn->suspendWrit(false);
+                [&buf, echo_client](std::shared_ptr<Connection> conn) {
                     conn->send(&buf[0], buf.size());
                 });
             echo_client->setReadEventCallback(
                 [&buf, pBytes, &active_clients, &loop, bytesPerClients,
-                 echo_client_, &clients](std::shared_ptr<Connection> &&conn) {
+                 echo_client_, echo_client](std::shared_ptr<Connection> conn) {
                     *pBytes += conn->read().size();
                     conn->send(conn->read());
 
                     if (*pBytes >= bytesPerClients) {
                         conn->destroy();
                         loop.getFirstPoller()->runEventHandler(
-                            [&active_clients, echo_client_, &clients] {
-                                clients.erase(echo_client_);
-                                active_clients--;
-                            });
+                            [&active_clients] { active_clients--; });
                     }
                 });
-            echo_client->setWriteAllCallback(
-                [&buf](std::shared_ptr<Connection> &&conn) {
-                    conn->suspendRead(false);
-                    conn->suspendWrit();
-                });
             echo_client->setErroEventCallback(
-                [&loop, &active_clients](std::shared_ptr<Connection> &&) {
+                [&loop, &active_clients,
+                 echo_client](std::shared_ptr<Connection> conn) {
                     loop.getFirstPoller()->runEventHandler(
                         [&active_clients] { active_clients--; });
                 });
         }
         echo_client->start();
-        clients[echo_client.get()] = echo_client;
     }
     loop.RunMainLoop([&active_clients] { return active_clients > 0; });
     auto end = Timestamp::now();
     info("总时间 %g 秒", (end - start).toSecF());
     info("totalBytes = %ld", totalBytes);
     info("速度 %lf MiB/s", totalBytes / (end - start).toSecF() / 1024 / 1024);
+    info(" QPS %d", (int)(concurrency * msg_num / (end - start).toSecF()));
     return 0;
 }

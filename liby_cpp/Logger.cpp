@@ -48,7 +48,7 @@ void Logger::log(LogLevel level, const char *file, const int line,
 
     int ret = ::write(STDERR_FILENO, buf, ::strlen(buf));
     // avoid the "variable set but not use" warning
-    (void)ret;
+    ClearUnuseVariableWarning(ret);
 
     //    queue_.push_notify(std::string(buf));
 }

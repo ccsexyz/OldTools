@@ -8,7 +8,7 @@ int main() {
     chat_server->setAcceptorCallback(
         [](std::shared_ptr<Connection> conn) { conn->suspendRead(false); });
     chat_server->setReadEventCallback(
-        [&chat_server](std::shared_ptr<Connection> &&conn) {
+        [&chat_server](std::shared_ptr<Connection> conn) {
             Buffer buf(conn->read().retriveveAllAsString());
             chat_server->runHanlderOnConns(
                 [buf, conn](std::shared_ptr<Connection> conn2) {
@@ -17,8 +17,6 @@ int main() {
                     }
                 });
         });
-    chat_server->setWriteAllCallback(
-        [](std::shared_ptr<Connection> &&conn) { conn->suspendRead(false); });
     chat_server->start();
     loop.RunMainLoop();
     return 0;

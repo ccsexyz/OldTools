@@ -13,8 +13,9 @@ class EventLoop;
 class TcpClient final : clean_ {
 public:
     using ConnectorCallback = std::function<void(std::shared_ptr<Connection>)>;
-    using ConnCallback = std::function<void(std::shared_ptr<Connection> &&)>;
+    using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
     TcpClient(const std::string &server_path, const std::string &server_port);
+    ~TcpClient() { debug("a client deconstruct %p ", this); }
     void setPoller(Poller *poller) { poller_ = poller; }
     Poller *getPoller() const { return poller_; }
     void setEventLoop(EventLoop *loop) { loop_ = loop; }
@@ -29,6 +30,9 @@ public:
 
 private:
     void destroy();
+
+public:
+    void *udata_ = nullptr;
 
 private:
     int clientfd_;

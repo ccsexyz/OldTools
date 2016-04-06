@@ -21,7 +21,7 @@
 
 using namespace Liby;
 
-__thread char extraBuffer[16384];
+__thread char extraBuffer[163840];
 
 static void set_noblock(int fd, bool flag = true) {
     int opt;
@@ -220,3 +220,5 @@ std::vector<FilePtr> File::accept() {
 void File::shutdownRead() { ::shutdown(fd_, SHUT_RD); }
 
 void File::shutdownWrit() { ::shutdown(fd_, SHUT_WR); }
+
+int File::checkSocketError() { return 0; }

@@ -10,10 +10,8 @@ int main() {
         conn->send(Buffer(Timestamp::now().toString()));
         conn->send('\n');
     });
-    daytime_server->setWriteAllCallback(
-        [&daytime_server](std::shared_ptr<Connection> &&conn) {
-            daytime_server->closeConn(conn);
-        });
+    daytime_server->setWriteAllCallback([&daytime_server](
+        std::shared_ptr<Connection> conn) { daytime_server->closeConn(conn); });
     daytime_server->start();
     loop.RunMainLoop();
     return 0;

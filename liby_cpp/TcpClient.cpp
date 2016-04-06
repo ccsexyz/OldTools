@@ -21,14 +21,17 @@ void TcpClient::start() {
     chan_->enableWrit();
     chan_->setWritEventCallback([this] {
         conn_ = std::make_shared<Connection>(poller_, clientfp_);
+        conn_->udata_ = udata_;
         conn_->setWritCallback(writeAllCallback_);
         conn_->setReadCallback(readEventCallback_);
-        conn_->setErroCallback([this](std::shared_ptr<Connection> &&conn) {
-            if (erroEventCallback_) {
-                erroEventCallback_(std::move(conn));
-            }
-            destroy();
-        });
+        //        conn_->setErroCallback([this](std::shared_ptr<Connection>
+        //        &&conn) {
+        //            if (erroEventCallback_) {
+        //                erroEventCallback_((conn));
+        //            }
+        //            destroy();
+        //        });
+        conn_->setErroCallback(erroEventCallback_);
         chan_.reset();
         poller_->runEventHandler([this] {
             conn_->init();
@@ -37,7 +40,12 @@ void TcpClient::start() {
             }
         });
     });
-    chan_->setErroEventCallback([this] { destroy(); });
+    chan_->setErroEventCallback([this] {
+        if (erroEventCallback_) {
+            erroEventCallback_(std::shared_ptr<Connection>());
+        }
+        destroy();
+    });
     chan_->addChanel();
 }
 

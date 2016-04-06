@@ -83,6 +83,15 @@ EventLoop::creatTcpClient(const std::string &server_path,
     return client;
 }
 
+std::shared_ptr<TcpClient>
+EventLoop::creatTcpClient(Poller *poller, const std::string &server_path,
+                          const std::string &server_port) {
+    TcpClientPtr client = std::make_shared<TcpClient>(server_path, server_port);
+    client->setPoller(poller);
+    client->setEventLoop(this);
+    return client;
+}
+
 std::shared_ptr<TcpServer>
 EventLoop::creatTcpServer(const std::string &server_path,
                           const std::string &server_port) {
