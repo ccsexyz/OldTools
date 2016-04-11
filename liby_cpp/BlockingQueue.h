@@ -66,7 +66,7 @@ private:
 private:
     std::mutex mutex_;
     std::list<T> queue_;
-    std::condition_variable_any cond_;
+    std::condition_variable cond_;
 };
 }
 

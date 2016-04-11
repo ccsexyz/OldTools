@@ -2,6 +2,7 @@
 #!*.*
 *.o
 *.lib
+*.user
 *.so
 chat
 chat_client
@@ -17,5 +18,7 @@ httpd
 httpd2
 time1
 time2
+tcp_proxy
+tcp_relayer
 pingpong
 liby_cpp/tests/all

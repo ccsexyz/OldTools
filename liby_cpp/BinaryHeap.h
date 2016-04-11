@@ -1,7 +1,3 @@
-//
-// Created by ccsexyz on 16-4-2.
-//
-
 #ifndef POLLERTEST_BINARYHEAP_H
 #define POLLERTEST_BINARYHEAP_H
 

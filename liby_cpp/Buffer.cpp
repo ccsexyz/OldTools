@@ -29,7 +29,7 @@ Buffer::Buffer(const Buffer &that) { deepCopy(that); }
 
 Buffer::Buffer(Buffer &that) { deepCopy(that); }
 
-Buffer::Buffer(Buffer &&that) { copy(that); }
+Buffer::Buffer(Buffer &&that) { swap(that); }
 
 Buffer &Buffer::operator=(const Buffer &that) {
     deepCopy(that);
@@ -51,11 +51,11 @@ void Buffer::deepCopy(const Buffer &that) {
     if (this == &that)
         return;
     resetBuffer();
-    capacity_ = that.size() + 1024;
+    capacity_ = that.size() + defaultPrependSize;
     buffer_ = new char[capacity_];
-    ::memcpy(buffer_ + 32, that.buffer_, that.size());
-    leftIndex_ = 32;
-    rightIndex_ = that.size() + 32;
+    ::memcpy(buffer_ + defaultPrependSize, that.data(), that.size());
+    leftIndex_ = defaultPrependSize;
+    rightIndex_ = that.size() + defaultPrependSize;
 }
 
 void Buffer::setBuffer(char *buf, off_t length) {
@@ -211,14 +211,14 @@ void Buffer::retrieve(off_t len) {
     if (size() == 0) {
         return;
     } else if (len == 0 || len > size()) {
-        retrieve(size());
+        leftIndex_ = rightIndex_ = 0;
     } else {
         leftIndex_ += len;
     }
-    if (size() < capacity_ / 2) {
-        Buffer b(*this);
-        swap(b);
-    }
+    //    if (size() < capacity_ / 2) {
+    //        Buffer b(*this);
+    //        swap(b);
+    //    }
 }
 
 std::string Buffer::retriveveAllAsString() { return retriveveAsString(size()); }
@@ -285,4 +285,11 @@ char *Buffer::wdata() {
 off_t Buffer::availbleSize() const {
     assert(buffer_ && rightIndex_ >= leftIndex_);
     return capacity_ - rightIndex_;
+}
+
+io_task::io_task(const io_task &that) {
+    fp_ = that.fp_;
+    offset_ = that.offset_;
+    len_ = that.len_;
+    buffer_ = that.buffer_;
 }

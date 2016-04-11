@@ -1,12 +1,14 @@
 #ifndef LIBY_File_H
 #define LIBY_File_H
 
+#include <deque>
 #include <memory>
 #include <vector>
 
 namespace Liby {
 class File;
 class Buffer;
+struct io_task;
 
 using FilePtr = std::shared_ptr<File>;
 
@@ -41,10 +43,13 @@ public:
     ssize_t write(void *buf, size_t nbyte);
     ssize_t read(Buffer &buffer);
     ssize_t write(Buffer &buffer);
+    ssize_t write(std::deque<io_task> &tasks_);
     std::vector<FilePtr> accept();
 
     int getErrno() const { return savedErrno_; }
     int checkSocketError();
+
+    void sendFile(int fd, off_t size); // only for socket fd_
 
 private:
     void tryCloseFd() const;

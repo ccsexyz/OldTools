@@ -55,3 +55,22 @@ void ExitCaller::callOnExit() {
         ExitCallerFunctors.begin(), ExitCallerFunctors.end(),
         [](decltype(*ExitCallerFunctors.begin()) &functor) { functor(); });
 }
+
+__thread time_t savedSec;
+thread_local std::string savedSecString;
+
+std::string Timestamp::toString() const {
+    std::string usecString = " " + std::to_string(tv_.tv_usec);
+    if (tv_.tv_sec != savedSec) {
+        struct tm result;
+        ::localtime_r(&(tv_.tv_sec), &result);
+        savedSec = tv_.tv_sec;
+        savedSecString = std::to_string(result.tm_year + 1900) + "." +
+                         std::to_string(result.tm_mon + 1) + "." +
+                         std::to_string(result.tm_mday) + " - " +
+                         std::to_string(result.tm_hour) + ":" +
+                         std::to_string(result.tm_min) + ":" +
+                         std::to_string(result.tm_sec);
+    }
+    return savedSecString + usecString;
+}

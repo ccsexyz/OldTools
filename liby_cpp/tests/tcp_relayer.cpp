@@ -60,7 +60,7 @@ public:
     }
 
     void onErroEventCallback(shared_ptr<Connection> conn) {
-        if (conn->udata_) {
+        if (conn && conn->udata_) {
             auto c = reinterpret_cast<shared_ptr<Connection> *>(conn->udata_);
             (*c)->udata_ = nullptr;
             (*c)->setErro();

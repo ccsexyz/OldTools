@@ -12,7 +12,7 @@
 #include <utility>
 
 #if __cplusplus < 201402L
-
+// support make_unique in c++ 11
 namespace std {
 template <typename T, typename... Args>
 inline typename enable_if<!is_array<T>::value, unique_ptr<T>>::type
@@ -140,15 +140,7 @@ public:
         rhs.tv_ = temp;
     }
 
-    std::string toString() const {
-        char buf[48] = {0};
-        ctime_r(&(tv_.tv_sec), buf);
-        for (int i = 0; buf[i]; i++) {
-            if (buf[i] == '\r' || buf[i] == '\n')
-                buf[i] = '\0';
-        }
-        return std::string(buf);
-    }
+    std::string toString() const;
 
     bool invalid() const { return tv_.tv_sec == 0 && tv_.tv_usec == 0; }
     bool valid() const { return !invalid(); }

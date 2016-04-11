@@ -7,8 +7,11 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
-#ifdef OS_LINUX
+#ifdef __linux__
 #include <sys/eventfd.h>
+#include <sys/sendfile.h>
+#elif defined(__APPLE__)
+#include <sys/uio.h>
 #endif
 #include "util.h"
 #include <sys/fcntl.h>
@@ -222,3 +225,78 @@ void File::shutdownRead() { ::shutdown(fd_, SHUT_RD); }
 void File::shutdownWrit() { ::shutdown(fd_, SHUT_WR); }
 
 int File::checkSocketError() { return 0; }
+
+void File::sendFile(int fd, off_t size) {
+#ifdef __linux__
+    ::sendfile(fd_, fd, nullptr, size);
+#elif defined(__APPLE__)
+    ::sendfile(fd, fd_, 0, &size, nullptr, 0);
+#endif
+}
+
+ssize_t File::write(std::deque<io_task> &tasks_) {
+    ssize_t bytes = 0;
+    while (!tasks_.empty()) {
+        auto &first = tasks_.front();
+        if (first.fp_) {
+#ifdef __linux__
+            off_t offset = first.offset_;
+            ssize_t ret = ::sendfile(fd_, first.fp_->fd(), &offset, first.len_);
+            if (ret < 0)
+                return ret;
+            if (ret == first.len_) {
+                tasks_.pop_front();
+                continue;
+            } else {
+                first.len_ -= ret;
+                first.offset_ += ret;
+                return -1;
+            }
+#elif defined(__APPLE__)
+            off_t len = first.len_;
+            int ret = ::sendfile(first.fp_->fd(), fd_, first.offset_, &len,
+                                 nullptr, 0);
+            if (ret < 0)
+                return ret;
+            // bytes += ret;
+            if (len == first.len_) {
+                tasks_.pop_front();
+                continue;
+            } else {
+                first.len_ -= len;
+                first.offset_ += len;
+                return -1;
+            }
+#endif
+        } else {
+            std::vector<struct iovec> iov;
+            for (auto &x : tasks_) {
+                if (!x.fp_ && x.buffer_) {
+                    struct iovec v;
+                    v.iov_base = x.buffer_->data();
+                    v.iov_len = x.buffer_->size();
+                    iov.emplace_back(v);
+                } else {
+                    break;
+                }
+            }
+            auto ret = ::writev(fd_, &iov[0], iov.size());
+            if (ret > 0) {
+                bytes += ret;
+                while (ret > 0) {
+                    auto firstBufferSize = tasks_.front().buffer_->size();
+                    if (firstBufferSize <= ret) {
+                        ret -= firstBufferSize;
+                        tasks_.pop_front();
+                    } else {
+                        tasks_.front().buffer_->retrieve(ret);
+                        return -1;
+                    }
+                }
+            } else {
+                return ret;
+            }
+        }
+    }
+    return bytes;
+}

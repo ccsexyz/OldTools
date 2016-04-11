@@ -2,6 +2,7 @@
 #define BUFFER_BUFFER_H
 
 #include <initializer_list>
+#include <memory>
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -9,7 +10,7 @@
 namespace Liby {
 class Buffer final {
 public:
-    const int defaultPrependSize = 32;
+    static const int defaultPrependSize = 0;
     Buffer() = default;
     explicit Buffer(const off_t length);
     Buffer(const char *buf, off_t length);
@@ -69,6 +70,21 @@ private:
     off_t leftIndex_ = 0;
     off_t rightIndex_ = 0;
     off_t capacity_ = 0;
+};
+
+class File;
+
+struct io_task final {
+    // for sendfile
+
+    io_task() = default;
+    io_task(const io_task &that);
+
+    std::shared_ptr<File> fp_;
+    off_t offset_ = 0;
+    off_t len_ = 0;
+
+    std::shared_ptr<Buffer> buffer_;
 };
 }
 

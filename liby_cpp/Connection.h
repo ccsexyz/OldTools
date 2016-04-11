@@ -11,6 +11,7 @@ namespace Liby {
 class Chanel;
 class File;
 class Poller;
+class File;
 
 class Connection final : clean_,
                          public std::enable_shared_from_this<Connection> {
@@ -38,6 +39,7 @@ public:
 
     Poller *getPoller() const;
     int getConnfd() const;
+    void sendFile(std::shared_ptr<File> fp, off_t offset, off_t len);
     void runEventHandler(BasicHandler handler);
     void cancelAllTimer();
     void cancelTimer(TimerId id);
@@ -61,11 +63,13 @@ public:
     void *udata_ = nullptr;
 
 private:
+    off_t writBytes_ = 0;
     Poller *poller_ = nullptr;
     std::set<TimerId> timerIds_;
     std::unique_ptr<Chanel> chan_;
     std::unique_ptr<Buffer> readBuf_;
     std::unique_ptr<Buffer> writBuf_;
+    std::deque<io_task> writTasks_;
     ConnCallback readEventCallback_;
     ConnCallback writeAllCallback_;
     ConnCallback errnoEventCallback_;

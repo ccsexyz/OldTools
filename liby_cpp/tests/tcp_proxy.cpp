@@ -43,7 +43,7 @@ public:
 
         string name = address;
         string port =
-            to_string(::ntohs(*reinterpret_cast<uint16_t *>(rbuf.data() + 2)));
+            to_string(ntohs(*reinterpret_cast<uint16_t *>(rbuf.data() + 2)));
 
         info("name : %s, port : %s", name.data(), port.data());
 
@@ -85,7 +85,7 @@ public:
         }
     }
     void onErroEventCallback(shared_ptr<Connection> conn) {
-        if (conn->udata_) {
+        if (conn && conn->udata_) {
             auto c = reinterpret_cast<shared_ptr<Connection> *>(conn->udata_);
             (*c)->udata_ = nullptr;
             (*c)->setErro();

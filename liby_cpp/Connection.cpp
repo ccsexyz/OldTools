@@ -29,7 +29,7 @@ void Connection::onRead() {
             readEventCallback_(shared_from_this());
             if (!writBuf_)
                 return;
-            if (writBuf_->size() >= writableLimit_) {
+            if (writBytes_ >= writableLimit_) {
                 if (writableLimitCallback_) {
                     writableLimitCallback_(shared_from_this());
                 } else {
@@ -50,34 +50,30 @@ void Connection::onRead() {
 }
 
 void Connection::onWrit() {
-    if (writBuf_->size() > 0) {
-        int ret = chan_->filePtr()->write(*writBuf_);
-        if (ret > 0) {
-            auto wbufsize = writBuf_->size();
-            if (wbufsize == 0) {
-                if (writeAllCallback_) {
-                    writeAllCallback_(shared_from_this());
-                    if (!chan_)
-                        return;
-                    if (!chan_->isEventsChanged()) {
-                        chan_->enableRead();
-                        chan_->enableWrit(false);
-                    }
-                } else {
-                    chan_->enableRead();
-                    chan_->enableWrit(false);
-                }
-                chan_->updateChanel();
+    if (writTasks_.empty()) {
+        chan_->enableWrit(false);
+        return;
+    }
+    int ret = chan_->filePtr()->write(writTasks_);
+    if (ret > 0) {
+        writBytes_ -= ret;
+        if (writTasks_.empty()) {
+            chan_->enableRead();
+            chan_->enableWrit(false);
+            if (writeAllCallback_) {
+                auto x = shared_from_this();
+                writeAllCallback_(x);
+                if (!chan_)
+                    return;
             }
-        } else {
-            if (ret != 0 && errno == EAGAIN) {
-                return;
-            } else {
-                onErro();
-            }
+            chan_->updateChanel();
         }
     } else {
-        chan_->enableWrit(false);
+        if (ret != 0 && errno == EAGAIN) {
+            return;
+        } else {
+            onErro();
+        }
     }
 }
 
@@ -116,26 +112,29 @@ void Connection::destroy() {
 int Connection::getConnfd() const { return chan_->filePtr()->fd(); }
 
 void Connection::send(const char *buf, off_t len) {
-    writBuf_->append(buf, len);
+    io_task task;
+    task.buffer_ = std::make_shared<Buffer>(buf, len);
+    writTasks_.emplace_back(task);
     chan_->enableWrit();
     chan_->updateChanel();
+    writBytes_ += len;
 }
 
 void Connection::send(Buffer &buf) {
-    // if(&buf == readBuf_.get() && writBuf_->empty()) {
-    //     readBuf_->swap(buf);
-    //     return;
-    // }
-
-    writBuf_->append(buf);
-    buf.retrieve();
+    writBytes_ += buf.size();
+    io_task task;
+    task.buffer_ = std::make_shared<Buffer>(buf.capacity());
+    task.buffer_->swap(buf);
+    writTasks_.emplace_back(task);
     chan_->enableWrit();
     chan_->updateChanel();
 }
 
 void Connection::send(Buffer &&buf) {
-    writBuf_->append(buf);
-    buf.retrieve();
+    writBytes_ += buf.size();
+    io_task task;
+    task.buffer_ = std::make_shared<Buffer>(std::move(buf));
+    writTasks_.emplace_back(task);
     chan_->enableWrit();
     chan_->updateChanel();
 }
@@ -145,7 +144,7 @@ void Connection::send(const char *buf) {
     send(buf, ::strlen(buf));
 }
 
-void Connection::send(const char c) { writBuf_->append(&c, 1); }
+void Connection::send(const char c) { send(&c, 1); }
 
 Buffer &Connection::read() { return *readBuf_; }
 
@@ -213,4 +212,17 @@ void Connection::setErro() {
         send(" ");
         chan_->enableErro();
     }
+}
+
+void Connection::sendFile(std::shared_ptr<File> fp, off_t offset, off_t len) {
+    assert(fp && offset >= 0 && len >= 0);
+
+    io_task task;
+    task.fp_ = fp;
+    task.offset_ = offset;
+    task.len_ = len;
+    writTasks_.push_back(task);
+    auto t = writTasks_.front();
+    chan_->enableWrit();
+    chan_->updateChanel();
 }

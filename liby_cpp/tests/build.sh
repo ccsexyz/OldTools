@@ -10,3 +10,4 @@ $cc -g -o chat chat.cpp ../*.cpp $cflags
 $cc -g -o echo_client echo_client.cpp ../*.cpp $cflags
 $cc -g -o tcp_relayer tcp_relayer.cpp ../*.cpp $cflags
 $cc -g -o tcp_proxy tcp_proxy.cpp ../*.cpp $cflags
+$cc -g -o httpd httpd.cpp ../*.cpp ../http/*.cpp $cflags
