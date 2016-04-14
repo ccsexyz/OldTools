@@ -11,6 +11,9 @@ TcpClient::TcpClient(const std::string &server_path,
                      const std::string &server_port) {
     clientfp_ = File::async_connect(server_path, server_port);
     clientfd_ = clientfp_->fd();
+    if(clientfd_ < 0) {
+        throw BaseException("clientfd < 0");
+    }
     chan_ = std::make_shared<Chanel>();
     chan_->setFilePtr(clientfp_);
 }
@@ -24,13 +27,6 @@ void TcpClient::start() {
         conn_->udata_ = udata_;
         conn_->setWritCallback(writeAllCallback_);
         conn_->setReadCallback(readEventCallback_);
-        //        conn_->setErroCallback([this](std::shared_ptr<Connection>
-        //        &&conn) {
-        //            if (erroEventCallback_) {
-        //                erroEventCallback_((conn));
-        //            }
-        //            destroy();
-        //        });
         conn_->setErroCallback(erroEventCallback_);
         chan_.reset();
         poller_->runEventHandler([this] {

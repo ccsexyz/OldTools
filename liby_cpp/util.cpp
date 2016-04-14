@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <unordered_map>
 
+using namespace Liby;
+
 static std::unordered_map<int, std::function<void()>> functors;
 static std::unordered_map<int, void (*)(int)> stored_funcs;
 
@@ -57,7 +59,7 @@ void ExitCaller::callOnExit() {
 }
 
 __thread time_t savedSec;
-thread_local std::string savedSecString;
+__thread char savedSecString[128]; // 似乎clang++并不支持thread_local的对象
 
 std::string Timestamp::toString() const {
     std::string usecString = " " + std::to_string(tv_.tv_usec);
@@ -65,12 +67,9 @@ std::string Timestamp::toString() const {
         struct tm result;
         ::localtime_r(&(tv_.tv_sec), &result);
         savedSec = tv_.tv_sec;
-        savedSecString = std::to_string(result.tm_year + 1900) + "." +
-                         std::to_string(result.tm_mon + 1) + "." +
-                         std::to_string(result.tm_mday) + " - " +
-                         std::to_string(result.tm_hour) + ":" +
-                         std::to_string(result.tm_min) + ":" +
-                         std::to_string(result.tm_sec);
+        sprintf(savedSecString, "%4d.%02d.%02d - %02d:%02d:%02d -",
+                result.tm_year + 1900, result.tm_mon + 1, result.tm_mday,
+                result.tm_hour, result.tm_min, result.tm_sec);
     }
     return savedSecString + usecString;
 }

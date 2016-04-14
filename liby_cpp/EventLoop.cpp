@@ -77,18 +77,28 @@ std::shared_ptr<Poller> &EventLoop::getSuitablePoller(int fd) {
 std::shared_ptr<TcpClient>
 EventLoop::creatTcpClient(const std::string &server_path,
                           const std::string &server_port) {
-    TcpClientPtr client = std::make_shared<TcpClient>(server_path, server_port);
-    client->setPoller(pollers_[client->clientfd() % (N + 1)].get());
-    client->setEventLoop(this);
+    TcpClientPtr client;
+    try {
+        client = std::make_shared<TcpClient>(server_path, server_port);
+        client->setPoller(pollers_[client->clientfd() % (N + 1)].get());
+        client->setEventLoop(this);
+    } catch(const BaseException &e) {
+        debug("%s", e.what().data());
+    }
     return client;
 }
 
 std::shared_ptr<TcpClient>
 EventLoop::creatTcpClient(Poller *poller, const std::string &server_path,
                           const std::string &server_port) {
-    TcpClientPtr client = std::make_shared<TcpClient>(server_path, server_port);
-    client->setPoller(poller);
-    client->setEventLoop(this);
+    TcpClientPtr client;
+    try {
+        client = std::make_shared<TcpClient>(server_path, server_port);
+        client->setPoller(poller);
+        client->setEventLoop(this);
+    } catch(const BaseException &e) {
+        debug("%s", e.what().data());
+    }
     return client;
 }
 

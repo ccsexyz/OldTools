@@ -86,7 +86,7 @@ void HttpServer::onReadEventCallback(std::shared_ptr<Connection> conn) {
                 break;
             }
         } else {
-            info("Request is Not all!");
+            info("Request isn't complete!");
             break;
         }
     }

@@ -5,7 +5,7 @@
 #include "Liby.h"
 #include "util.h"
 #include <memory>
-#include <set>
+#include <unordered_set>
 
 namespace Liby {
 class Chanel;
@@ -20,9 +20,11 @@ public:
     const size_t defaultWritableLimit = 16 * 4096;
     using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
     Connection(Poller *poller, std::shared_ptr<File> &fp);
+    ~Connection();
 
     void init();
 
+    void send(void *base, off_t len) { send(static_cast<const char *>(base), len); }
     void send(const char *buf, off_t len);
     void send(Buffer &buf);
     void send(Buffer &&buf);
@@ -65,10 +67,10 @@ public:
 private:
     off_t writBytes_ = 0;
     Poller *poller_ = nullptr;
-    std::set<TimerId> timerIds_;
+    std::unordered_set<TimerId> timerIds_;
     std::unique_ptr<Chanel> chan_;
     std::unique_ptr<Buffer> readBuf_;
-    std::unique_ptr<Buffer> writBuf_;
+//    std::unique_ptr<Buffer> writBuf_;
     std::deque<io_task> writTasks_;
     ConnCallback readEventCallback_;
     ConnCallback writeAllCallback_;

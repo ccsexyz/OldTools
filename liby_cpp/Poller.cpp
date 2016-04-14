@@ -167,7 +167,7 @@ void PollerEpoll::updateChanel(Chanel *chan) {
     assert(chan && chan->getChanelFd() >= 0);
 
     if (!chan->isEventsChanged()) {
-        return;
+        // return;
     }
 
     struct epoll_event event;
@@ -496,7 +496,7 @@ void PollerKevent::removeChanel(Chanel *ch) {
 void PollerKevent::updateChanel(Chanel *ch) {
 #ifdef __APPLE__
     if (!ch->isEventsChanged()) {
-        return;
+        // return;
     }
 
     debug("try to update %p", ch);
@@ -517,6 +517,7 @@ void PollerKevent::updateChanel(Chanel *ch) {
         EV_SET(&changes, ch->getChanelFd(), EVFILT_WRITE, EV_DELETE, 0, 0, ch);
     }
     changes_.push_back(changes);
+    updateKevents();
 #endif
 }
 

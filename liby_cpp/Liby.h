@@ -7,5 +7,6 @@
 #include "Poller.h"
 #include "TcpClient.h"
 #include "TcpServer.h"
+#include "http/HttpServer.h"
 
 #endif // POLLERTEST_LIBY_H

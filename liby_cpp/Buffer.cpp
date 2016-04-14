@@ -21,9 +21,9 @@ Buffer::Buffer(const char *buf, off_t length) {
     capacity_ = length;
 }
 
-Buffer::Buffer(std::vector<char> buf) : Buffer(&buf[0], buf.size()) {}
+Buffer::Buffer(const std::vector<char> &buf) : Buffer(&buf[0], buf.size()) {}
 
-Buffer::Buffer(std::string buf) : Buffer(buf.data(), buf.size()) {}
+Buffer::Buffer(const std::string &buf) : Buffer(buf.data(), buf.size() + 1) {}
 
 Buffer::Buffer(const Buffer &that) { deepCopy(that); }
 
@@ -110,6 +110,14 @@ void Buffer::append(const char *buf, off_t len) {
         reserve(minSize);
     }
     safeAppend(buf, len);
+}
+
+void Buffer::append(const std::string &str) {
+    append(str.data(), str.size() + 1);
+}
+
+void Buffer::prepend(const std::string &str) {
+    prepend(str.data(), str.size() + 1);
 }
 
 void Buffer::safeAppend(const char *buf, off_t len) {
@@ -206,11 +214,15 @@ void Buffer::resize(off_t minSize) {
     capacity_ = minSize;
 }
 
+void Buffer::retrieve() {
+    leftIndex_ = rightIndex_ = 0;
+}
+
 void Buffer::retrieve(off_t len) {
     assert(len >= 0);
     if (size() == 0) {
         return;
-    } else if (len == 0 || len > size()) {
+    } else if (len > size()) {
         leftIndex_ = rightIndex_ = 0;
     } else {
         leftIndex_ += len;

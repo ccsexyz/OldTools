@@ -51,7 +51,7 @@ public:
 
     void erase_if(std::function<bool(const_reference_type)> f_) {
         if (empty())
-            throw;
+            return;
         uint32_t i = 1;
         for (; i < size_ + 1; i++) {
             if (f_(heap[i])) {

@@ -1,6 +1,6 @@
 #! /bin/sh
 
-cc=g++
+cc=g++-5
 cflags='-lpthread -std=c++14 -Wall -Werror'
 $cc -g -o all all.cpp ../*.cpp $cflags
 $cc -g -o echo echo.cpp ../*.cpp $cflags

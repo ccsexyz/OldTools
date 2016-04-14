@@ -1,8 +1,5 @@
 #include "Connection.h"
-#include "Buffer.h"
-#include "Chanel.h"
-#include "Poller.h"
-#include "string.h"
+#include <string.h>
 
 using namespace Liby;
 
@@ -11,7 +8,7 @@ Connection::Connection(Poller *poller, std::shared_ptr<File> &fp) {
     poller_ = poller;
     chan_ = std::make_unique<Chanel>(poller, fp);
     readBuf_ = std::make_unique<Buffer>(4096);
-    writBuf_ = std::make_unique<Buffer>(4096);
+//    writBuf_ = std::make_unique<Buffer>(4096);
 }
 
 void Connection::init() {
@@ -26,9 +23,14 @@ void Connection::onRead() {
     int ret = chan_->filePtr()->read(*readBuf_);
     if (ret > 0) {
         if (readEventCallback_) {
-            readEventCallback_(shared_from_this());
-            if (!writBuf_)
+            auto x = shared_from_this(); // readEventCallback可能会试图销毁这个对象
+                                         // 在这里给引用计数加一以适当延长对象生命期
+                                         // 从readEventCallback返回时可能对象内部的Chanel,Buffer对象已经失效
+            readEventCallback_(x);
+            if(!readBuf_)
                 return;
+//            if (!writBuf_)
+//                return;
             if (writBytes_ >= writableLimit_) {
                 if (writableLimitCallback_) {
                     writableLimitCallback_(shared_from_this());
@@ -102,7 +104,7 @@ void Connection::destroy() {
     debug("try to destroy connection %p", this);
     chan_.reset();
     readBuf_.reset();
-    writBuf_.reset();
+    writTasks_.clear();
     cancelAllTimer();
     writeAllCallback_ = nullptr;
     errnoEventCallback_ = nullptr;
@@ -112,6 +114,8 @@ void Connection::destroy() {
 int Connection::getConnfd() const { return chan_->filePtr()->fd(); }
 
 void Connection::send(const char *buf, off_t len) {
+    if(!readBuf_)
+        return;
     io_task task;
     task.buffer_ = std::make_shared<Buffer>(buf, len);
     writTasks_.emplace_back(task);
@@ -121,6 +125,8 @@ void Connection::send(const char *buf, off_t len) {
 }
 
 void Connection::send(Buffer &buf) {
+    if(!readBuf_)
+        return;
     writBytes_ += buf.size();
     io_task task;
     task.buffer_ = std::make_shared<Buffer>(buf.capacity());
@@ -131,6 +137,8 @@ void Connection::send(Buffer &buf) {
 }
 
 void Connection::send(Buffer &&buf) {
+    if(!readBuf_)
+        return;
     writBytes_ += buf.size();
     io_task task;
     task.buffer_ = std::make_shared<Buffer>(std::move(buf));
@@ -226,3 +234,9 @@ void Connection::sendFile(std::shared_ptr<File> fp, off_t offset, off_t len) {
     chan_->enableWrit();
     chan_->updateChanel();
 }
+
+Connection::~Connection() {
+    debug("DELETE CONNECTION %p", this);
+}
+
+

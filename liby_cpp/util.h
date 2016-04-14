@@ -35,14 +35,20 @@ make_unique(Args &&...) = delete;
 
 #endif
 
+namespace Liby {
+
 using BasicHandler = std::function<void()>;
 
 struct clean_ {
 public:
     clean_(const clean_ &) = delete;
+
     clean_(clean_ &&) = delete;
+
     clean_ &operator=(const clean_ &) = delete;
+
     clean_() = default;
+
     ~clean_() = default;
 };
 
@@ -50,11 +56,14 @@ class DeferCaller final : clean_ {
 public:
     DeferCaller(std::function<void()> &&functor)
         : functor_(std::move(functor)) {}
+
     DeferCaller(const std::function<void()> &functor) : functor_(functor) {}
+
     ~DeferCaller() {
         if (functor_)
             functor_();
     }
+
     void cancel() { functor_ = nullptr; }
 
 private:
@@ -64,6 +73,7 @@ private:
 class ErrnoSaver final : clean_ {
 public:
     ErrnoSaver() : savedErrno_(errno) {}
+
     ~ErrnoSaver() { errno = savedErrno_; }
 
 private:
@@ -73,10 +83,12 @@ private:
 class ExitCaller final : clean_ {
 public:
     static ExitCaller &getCaller();
+
     static void call(const std::function<void()> &functor);
 
 private:
     void callImp(const std::function<void()> &functor);
+
     static void callOnExit();
 
 private:
@@ -95,6 +107,7 @@ public:
             }
         }
     }
+
     virtual ~DeconstructCaller() {
         if (handlers_ == NULL)
             return;
@@ -143,18 +156,22 @@ public:
     std::string toString() const;
 
     bool invalid() const { return tv_.tv_sec == 0 && tv_.tv_usec == 0; }
+
     bool valid() const { return !invalid(); }
 
     time_t sec() const { return tv_.tv_sec; }
+
     suseconds_t usec() const { return tv_.tv_usec; }
 
     uint64_t toMillSec() const {
         return tv_.tv_sec * 1000 + tv_.tv_usec / 1000;
     }
+
     double toSecF() const {
         return static_cast<double>(tv_.tv_usec) / 1000000.0 +
                static_cast<double>(tv_.tv_sec);
     }
+
     double toMillSecF() const {
         return static_cast<double>(tv_.tv_usec) / 1000.0 +
                static_cast<double>(tv_.tv_sec * 1000);
@@ -184,6 +201,7 @@ public:
         ret.gettimeofday();
         return ret;
     }
+
     static Timestamp invalidTime() { return Timestamp(); }
 
 private:
@@ -226,18 +244,23 @@ inline Timestamp operator+(const Timestamp &lhs, const Timestamp &rhs) {
 class Signal final {
 public:
     static void signal(int signo, const std::function<void()> &handler);
+
     static void reset(int signo);
 };
 
 class BaseException {
 public:
     BaseException() = delete;
+
     BaseException(const std::string errmsg)
         : linenumber_(-1), errmsg_(errmsg) {}
+
     BaseException(const std::string &filename, int linenumber,
                   const std::string errmsg)
         : linenumber_(linenumber), filename_(filename), errmsg_(errmsg) {}
+
     virtual ~BaseException() = default;
+
     std::string what() const {
         if (linenumber_ >= 0)
             return filename_ + std::to_string(linenumber_) + errmsg_;
@@ -254,4 +277,103 @@ private:
 template <typename T> void ClearUnuseVariableWarning(T &&) { /*do nothing*/
 }
 
+template <typename T> class Trie final : clean_ {
+public:
+    static const int max_elements = 95;
+    using class_type = Trie<T>;
+    using value_type = T;
+
+    Trie() {
+        nodes_ = new class_type *[max_elements];
+        for (int i = 0; i < max_elements; i++) {
+            nodes_[i] = nullptr;
+        }
+    }
+
+    ~Trie() {
+        for (int i = 0; i < max_elements; i++) {
+            delete nodes_[i];
+        }
+        delete element_;
+        delete[] nodes_;
+    }
+
+    T &operator[](const std::string &str) { return operator[](str.data()); }
+
+    T &operator[](const char *str) {
+        if (str == nullptr)
+            throw;
+
+        class_type *p = this;
+        for(; *str != '\0'; ++str) {
+            int i = conv(*str);
+            if(p->nodes_[i] == nullptr) {
+                p->nodes_[i] = new class_type;
+            }
+            p = p->nodes_[i];
+        }
+
+        if(p->element_ == nullptr) {
+            p->element_ = new T;
+        }
+        return *(p->element_);
+    }
+
+    bool find(const char *str) {
+        if (str == nullptr)
+            return false;
+
+        class_type *p = this;
+        for(; *str != '\0'; ++str) {
+            int i = conv(*str);
+            if(p->nodes_[i] == nullptr)
+                return false;
+            p = p->nodes_[i];
+        }
+
+        if(p->element_ == nullptr) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    bool find(const std::string &str) { return find(str.data()); }
+
+    void insert(const char *str, const T &element) {
+        if (str == nullptr)
+            throw;
+
+        class_type *p = this;
+        for(; *str != '\0'; ++str) {
+            int i = conv(*str);
+            if(p->nodes_[i] == nullptr) {
+                p->nodes_[i] = new class_type;
+            }
+            p = p->nodes_[i];
+        }
+
+        if(p->element_ == nullptr) {
+            p->element_ = new T(element);
+        } else {
+            *(p->element_) = element;
+        }
+    }
+
+    void insert(const std::string &str, const T &element_) {
+        insert(str.data(), element_);
+    }
+
+private:
+    int conv(int c) {
+        if (c < 32 || c > 126)
+            throw;
+        return c - 32;
+    }
+
+private:
+    T *element_ = nullptr;
+    Trie<T> **nodes_;
+};
+}
 #endif // LIBY_UTIL_H

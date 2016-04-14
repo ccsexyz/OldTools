@@ -12,7 +12,7 @@
 
 using namespace Liby;
 
-std::atomic<uint64_t> Timer::timerIds_;
+std::atomic<uint64_t> Timer::timerIds_(1); // tiemrId will never be zero, so zero timerId is invalid
 
 TimerQueue::TimerQueue(Poller *poller) : poller_(poller) {
 #ifdef __linux__
@@ -75,6 +75,8 @@ void TimerQueue::destroy() {
 }
 
 void TimerQueue::cancel(TimerId id) {
+    if(id == 0)
+        return;
     queue_.erase_if([id](const Timer &timer) { return timer.id() == id; });
 }
 
@@ -92,9 +94,12 @@ void TimerQueue::handleTimeoutEvents() {
         if (now < minTimer.timeout()) {
             break;
         }
-        minTimer.runHandler();
+//        minTimer.runHandler();
+        auto savedMinTimer = minTimer;
+        // warning : minTimer handler may delete itself, so make a copy
         debug("delete timer id = %lu\n", minTimer.id());
         queue_.delete_min();
+        savedMinTimer.runHandler();
     }
     if (!queue_.empty()) {
         updateTimerfd(queue_.find_min().timeout());
@@ -103,6 +108,8 @@ void TimerQueue::handleTimeoutEvents() {
 
 void TimerQueue::insert(const Timer &timer) {
     debug("add timer id = %lu", timer.id());
+    if(timer.id() == 0) // ignore all timer which id is zero
+        return;
     if (queue_.empty()) {
         updateTimerfd(timer.timeout());
     }

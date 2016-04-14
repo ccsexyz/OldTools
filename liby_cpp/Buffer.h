@@ -14,8 +14,8 @@ public:
     Buffer() = default;
     explicit Buffer(const off_t length);
     Buffer(const char *buf, off_t length);
-    Buffer(std::string buf);
-    Buffer(std::vector<char> buf);
+    Buffer(const std::string &buf);
+    Buffer(const std::vector<char> &buf);
     Buffer(const Buffer &that);
     Buffer(Buffer &that);
     Buffer(Buffer &&that);
@@ -36,15 +36,18 @@ public:
     void append(off_t n);
     void append(const Buffer &that);
     void append(const char *buf, off_t size);
+    void append(const std::string &str);
     void prepend(const Buffer &that);
     void prepend(const char *buf, off_t size);
+    void prepend(const std::string &str);
     void forward(off_t offset = 0);  // may lose data
     void backward(off_t offset = 0); // may lose data
     void reserve(off_t minSize);
     void resize(off_t minSize);
     void shrink(off_t len);
     void shrink_to_fit(off_t len = 0);
-    void retrieve(off_t len = 0);
+    void retrieve(off_t len);
+    void retrieve();
     std::string retriveveAllAsString();
     std::string retriveveAsString(off_t len = 0);
     std::vector<char> retriveveAllAsVector();

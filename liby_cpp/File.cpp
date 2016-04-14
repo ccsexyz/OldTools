@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include <cstring>
 #include <errno.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -15,10 +16,6 @@
 #endif
 #include "util.h"
 #include <sys/fcntl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <unistd.h>
 
 #define QLEN (10)
 
@@ -71,7 +68,7 @@ static int initsocket(int type, const struct sockaddr *addr, socklen_t alen,
 
 errout:
     err = errno;
-    close(fd);
+    ::close(fd);
     errno = err;
     return -1;
 }
@@ -113,7 +110,7 @@ static int connect_tcp(const char *host, const char *port, int is_noblock) {
     hints.ai_socktype = SOCK_STREAM;
 
     if ((ret = ::getaddrinfo(host, port, &hints, &res)) != 0) {
-        fatal("getaddrinfo error: %s", ::gai_strerror(ret));
+        error("getaddrinfo error: %s", ::gai_strerror(ret));
         return -1;
     }
 
@@ -235,7 +232,7 @@ void File::sendFile(int fd, off_t size) {
 }
 
 ssize_t File::write(std::deque<io_task> &tasks_) {
-    ssize_t bytes = 0;
+    ssize_t bytes = 0; // 注: sendfile的字节数不计入bytes中
     while (!tasks_.empty()) {
         auto &first = tasks_.front();
         if (first.fp_) {
@@ -258,7 +255,6 @@ ssize_t File::write(std::deque<io_task> &tasks_) {
                                  nullptr, 0);
             if (ret < 0)
                 return ret;
-            // bytes += ret;
             if (len == first.len_) {
                 tasks_.pop_front();
                 continue;
