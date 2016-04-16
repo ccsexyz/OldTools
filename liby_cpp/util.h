@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <type_traits>
 #include <utility>
+#include <unordered_set>
 
 #if __cplusplus < 201402L
 // support make_unique in c++ 11
@@ -375,5 +376,32 @@ private:
     T *element_ = nullptr;
     Trie<T> **nodes_;
 };
+
+
+    class Poller;
+    class TimerSet {
+    public:
+        using TimerId = uint64_t;
+        TimerSet(Poller *poller = nullptr)
+            : poller_(poller) {}
+        ~TimerSet() {
+            cancelAllTimer();
+        }
+
+        void cancelAllTimer();
+        void cancelTimer(TimerId id);
+        TimerId runAt(const Timestamp &timestamp, const BasicHandler &handler);
+        TimerId runAfter(const Timestamp &timestamp, const BasicHandler &handler);
+        TimerId runEvery(const Timestamp &timestamp, const BasicHandler &handler);
+
+    protected:
+        void setPoller(Poller *poller) {
+            poller_ = poller;
+        }
+
+    private:
+        Poller *poller_ = nullptr;
+        std::unordered_set<TimerId> timerIds_;
+    };
 }
 #endif // LIBY_UTIL_H

@@ -10,13 +10,16 @@ class File;
 class Poller;
 class EventLoop;
 
-class TcpClient final : clean_ {
+class TcpClient final : clean_, public TimerSet {
 public:
     using ConnectorCallback = std::function<void(std::shared_ptr<Connection>)>;
     using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
     TcpClient(const std::string &server_path, const std::string &server_port);
     ~TcpClient() { debug("a client deconstruct %p ", this); }
-    void setPoller(Poller *poller) { poller_ = poller; }
+    void setPoller(Poller *poller) {
+        poller_ = poller;
+        TimerSet::setPoller(poller_);
+    }
     Poller *getPoller() const { return poller_; }
     void setEventLoop(EventLoop *loop) { loop_ = loop; }
     EventLoop *getEventLoop() const { return loop_; }

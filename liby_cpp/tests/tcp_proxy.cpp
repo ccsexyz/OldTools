@@ -51,7 +51,7 @@ public:
 
         shared_ptr<TcpClient> cl =
             loop_->creatTcpClient(conn->getPoller(), name, port);
-        TimerId id = conn->getPoller()->runAfter(
+        TimerId id = cl->runAfter(
             Timestamp(8, 0), [cl] { error("fd %d timeout", cl->clientfd()); });
         cl->setConnectorCallback(
             [this, conn, id](shared_ptr<Connection> conn2) {
@@ -59,7 +59,7 @@ public:
                 conn2->udata_ = new shared_ptr<Connection>(conn);
                 conn->suspendRead(false);
                 conn2->suspendRead(false);
-                conn2->getPoller()->cancelTimer(id);
+                conn2->cancelTimer(id);
 
                 char response[8];
                 response[0] = 0x0;

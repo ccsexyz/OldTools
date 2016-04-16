@@ -3,7 +3,7 @@
 
 using namespace Liby;
 
-Connection::Connection(Poller *poller, std::shared_ptr<File> &fp) {
+Connection::Connection(Poller *poller, std::shared_ptr<File> &fp) : TimerSet(poller){
     assert(poller && fp && fp->fd() >= 0);
     poller_ = poller;
     chan_ = std::make_unique<Chanel>(poller, fp);
@@ -174,38 +174,38 @@ void Connection::suspendWrit(bool flag) {
     chan_->updateChanel();
 }
 
-TimerId Connection::runAt(const Timestamp &timestamp,
-                          const BasicHandler &handler) {
-    TimerId id = poller_->runAt(timestamp, handler);
-    timerIds_.insert(id);
-    return id;
-}
-
-TimerId Connection::runAfter(const Timestamp &timestamp,
-                             const BasicHandler &handler) {
-    TimerId id = poller_->runAfter(timestamp, handler);
-    timerIds_.insert(id);
-    return id;
-}
-
-TimerId Connection::runEvery(const Timestamp &timestamp,
-                             const BasicHandler &handler) {
-    TimerId id = poller_->runEvery(timestamp, handler);
-    timerIds_.insert(id);
-    return id;
-}
-
-void Connection::cancelAllTimer() {
-    for (auto &x : timerIds_) {
-        poller_->cancelTimer(x);
-    }
-    timerIds_.clear();
-}
-
-void Connection::cancelTimer(TimerId id) {
-    timerIds_.erase(id);
-    poller_->cancelTimer(id);
-}
+//TimerId Connection::runAt(const Timestamp &timestamp,
+//                          const BasicHandler &handler) {
+//    TimerId id = poller_->runAt(timestamp, handler);
+//    timerIds_.insert(id);
+//    return id;
+//}
+//
+//TimerId Connection::runAfter(const Timestamp &timestamp,
+//                             const BasicHandler &handler) {
+//    TimerId id = poller_->runAfter(timestamp, handler);
+//    timerIds_.insert(id);
+//    return id;
+//}
+//
+//TimerId Connection::runEvery(const Timestamp &timestamp,
+//                             const BasicHandler &handler) {
+//    TimerId id = poller_->runEvery(timestamp, handler);
+//    timerIds_.insert(id);
+//    return id;
+//}
+//
+//void Connection::cancelAllTimer() {
+//    for (auto &x : timerIds_) {
+//        poller_->cancelTimer(x);
+//    }
+//    timerIds_.clear();
+//}
+//
+//void Connection::cancelTimer(TimerId id) {
+//    timerIds_.erase(id);
+//    poller_->cancelTimer(id);
+//}
 
 void Connection::setWritableLimit(size_t writableLimit) {
     writableLimit_ = writableLimit;

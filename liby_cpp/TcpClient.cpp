@@ -28,13 +28,13 @@ void TcpClient::start() {
         conn_->setWritCallback(writeAllCallback_);
         conn_->setReadCallback(readEventCallback_);
         conn_->setErroCallback(erroEventCallback_);
-        chan_.reset();
         poller_->runEventHandler([this] {
             conn_->init();
             if (connector_) {
                 connector_(conn_);
             }
         });
+        chan_.reset();
     });
     chan_->setErroEventCallback([this] {
         if (erroEventCallback_) {
@@ -58,4 +58,5 @@ void TcpClient::destroy() {
     readEventCallback_ = nullptr;
     writeAllCallback_ = nullptr;
     erroEventCallback_ = nullptr;
+    cancelAllTimer();
 }

@@ -1,4 +1,5 @@
 #include "util.h"
+#include "Poller.h"
 #include <list>
 #include <mutex>
 #include <signal.h>
@@ -72,4 +73,41 @@ std::string Timestamp::toString() const {
                 result.tm_hour, result.tm_min, result.tm_sec);
     }
     return savedSecString + usecString;
+}
+
+void TimerSet::cancelAllTimer() {
+    assert(poller_);
+
+    std::unordered_set<TimerId> timerIds; // timer handler may destroy this class
+    timerIds.swap(timerIds_);
+    for(auto &x : timerIds) {
+        poller_->cancelTimer(x);
+    }
+}
+
+void TimerSet::cancelTimer(TimerId id) {
+    assert(poller_);
+    timerIds_.erase(id);
+    poller_->cancelTimer(id);
+}
+
+TimerId TimerSet::runAt(const Timestamp &timestamp, const BasicHandler &handler) {
+    assert(poller_);
+    TimerId id = poller_->runAt(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
+}
+
+TimerId TimerSet::runAfter(const Timestamp &timestamp, const BasicHandler &handler) {
+    assert(poller_);
+    TimerId id = poller_->runAfter(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
+}
+
+TimerId TimerSet::runEvery(const Timestamp &timestamp, const BasicHandler &handler) {
+    assert(poller_);
+    TimerId id = poller_->runEvery(timestamp, handler);
+    timerIds_.insert(id);
+    return id;
 }

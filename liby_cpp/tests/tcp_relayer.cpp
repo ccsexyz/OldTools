@@ -28,7 +28,7 @@ public:
             loop_->creatTcpClient(conn->getPoller(), name_, port_);
         weak_ptr<Connection> weak_conn(conn);
         conn->suspendRead();
-        TimerId id = cl->getPoller()->runAfter(Timestamp(50, 0), [cl] {
+        TimerId id = cl->runAfter(Timestamp(50, 0), [cl] {
             // timeout
         });
         cl->setConnectorCallback(

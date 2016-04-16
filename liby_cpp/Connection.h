@@ -14,6 +14,7 @@ class Poller;
 class File;
 
 class Connection final : clean_,
+                         public TimerSet,
                          public std::enable_shared_from_this<Connection> {
 public:
     using TimerId = uint64_t;
@@ -43,11 +44,11 @@ public:
     int getConnfd() const;
     void sendFile(std::shared_ptr<File> fp, off_t offset, off_t len);
     void runEventHandler(BasicHandler handler);
-    void cancelAllTimer();
-    void cancelTimer(TimerId id);
-    TimerId runAt(const Timestamp &timestamp, const BasicHandler &handler);
-    TimerId runAfter(const Timestamp &timestamp, const BasicHandler &handler);
-    TimerId runEvery(const Timestamp &timestamp, const BasicHandler &handler);
+//    void cancelAllTimer();
+//    void cancelTimer(TimerId id);
+//    TimerId runAt(const Timestamp &timestamp, const BasicHandler &handler);
+//    TimerId runAfter(const Timestamp &timestamp, const BasicHandler &handler);
+//    TimerId runEvery(const Timestamp &timestamp, const BasicHandler &handler);
 
     void suspendRead(bool flag = true);
     void suspendWrit(bool flag = true);
