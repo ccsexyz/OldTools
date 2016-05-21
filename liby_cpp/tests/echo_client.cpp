@@ -41,11 +41,11 @@ int main(int argc, char **argv) {
         if (i < active_clients) {
             unsigned long *pBytes = &bytes[i];
             auto echo_client_ = echo_client.get();
-            echo_client->setConnectorCallback(
+            echo_client->onConnect(
                 [&buf, echo_client](std::shared_ptr<Connection> conn) {
                     conn->send(&buf[0], buf.size());
                 });
-            echo_client->setReadEventCallback(
+            echo_client->onRead(
                 [&buf, pBytes, &active_clients, &loop, bytesPerClients,
                  echo_client_, echo_client](std::shared_ptr<Connection> conn) {
                     *pBytes += conn->read().size();
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
                             [&active_clients] { active_clients--; });
                     }
                 });
-            echo_client->setErroEventCallback(
+            echo_client->onErro(
                 [&loop, &active_clients,
                  echo_client](std::shared_ptr<Connection> conn) {
                     loop.getFirstPoller()->runEventHandler(

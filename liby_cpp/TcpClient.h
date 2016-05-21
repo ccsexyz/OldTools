@@ -1,56 +1,61 @@
-#ifndef POLLERTEST_TCPCLIENT_H
-#define POLLERTEST_TCPCLIENT_H
+#ifndef POLLERTEST_TTCPCLIENT_H
+#define POLLERTEST_TTCPCLIENT_H
 
 #include "util.h"
 
 namespace Liby {
-class Chanel;
-class Connection;
-class File;
-class Poller;
-class EventLoop;
-
 class TcpClient final : clean_, public TimerSet {
 public:
-    using ConnectorCallback = std::function<void(std::shared_ptr<Connection>)>;
-    using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
-    TcpClient(const std::string &server_path, const std::string &server_port);
-    ~TcpClient() { debug("a client deconstruct %p ", this); }
-    void setPoller(Poller *poller) {
-        poller_ = poller;
-        TimerSet::setPoller(poller_);
-    }
-    Poller *getPoller() const { return poller_; }
-    void setEventLoop(EventLoop *loop) { loop_ = loop; }
-    EventLoop *getEventLoop() const { return loop_; }
-    int clientfd() const { return clientfd_; }
     void start();
-    void setConnectorCallback(ConnectorCallback cb) { connector_ = cb; }
-    void setReadEventCallback(ConnCallback cb) { readEventCallback_ = cb; }
-    void setWriteAllCallback(ConnCallback cb) { writeAllCallback_ = cb; }
-    void setErroEventCallback(ConnCallback cb) { erroEventCallback_ = cb; }
-    void runAsyncHandler(BasicHandler cb);
-
-private:
-    void destroy();
+    TcpClient &setPoller(Poller *poller) {
+        poller_ = poller;
+        TimerSet::setPoller(poller);
+        return *this;
+    }
+    TcpClient &setPoller(Poller &poller) { return setPoller(&poller); }
+    TcpClient &setEventLoop(EventLoop *loop) {
+        loop_ = loop;
+        return *this;
+    }
+    TcpClient &setEventLoop(EventLoop &loop) { return setEventLoop(&loop); }
+    TcpClient &setSocket(Socket *s);
+    TcpClient &setSocket(Socket &s) { return setSocket(&s); }
+    int clientfd() const { return clientfd_; }
+    TcpClient &onConnect(const ConnCallback &cb) {
+        connector_ = cb;
+        return *this;
+    }
+    TcpClient &onRead(const ConnCallback &cb) {
+        readEventCallback_ = cb;
+        return *this;
+    }
+    TcpClient &onWrit(const ConnCallback &cb) {
+        writeAllCallback_ = cb;
+        return *this;
+    }
+    TcpClient &onErro(const ConnCallback &cb) {
+        erroEventCallback_ = cb;
+        return *this;
+    }
 
 public:
     void *udata_ = nullptr;
 
 private:
+    void destroy();
+
+private:
     int clientfd_;
     Poller *poller_;
     EventLoop *loop_;
-    std::shared_ptr<File> clientfp_;
-    std::shared_ptr<Chanel> chan_;
-    std::shared_ptr<Connection> conn_;
-    ConnectorCallback connector_;
+    Socket *socket_;
+    FilePtr clientfp_;
+    std::unique_ptr<Channel> chan_;
+    ConnCallback connector_;
     ConnCallback erroEventCallback_;
     ConnCallback readEventCallback_;
     ConnCallback writeAllCallback_;
 };
-
-using TcpClientPtr = std::shared_ptr<TcpClient>;
 }
 
-#endif // POLLERTEST_TCPCLIENT_H
+#endif // POLLERTEST_TTCPCLIENT_H

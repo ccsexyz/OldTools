@@ -11,11 +11,11 @@ public:
         server_ = loop_->creatTcpServer("localhost", listenport);
     }
     void start() {
-        server_->setAcceptorCallback(
+        server_->onAccept(
             bind(&TcpProxy::onAcceptCallback, this, std::placeholders::_1));
-        server_->setReadEventCallback(bind(&TcpProxy::handleConnectionRequest,
+        server_->onRead(bind(&TcpProxy::handleConnectionRequest,
                                            this, std::placeholders::_1));
-        server_->setErroEventCallback(
+        server_->onErro(
             bind(&TcpProxy::onErroEventCallback, this, std::placeholders::_1));
         server_->start();
     }
@@ -30,14 +30,12 @@ public:
             reinterpret_cast<unsigned char *>(rbuf.data())[1];
         if (ver != 4 || command != 1) {
             error("bad version or command");
-            server_->closeConn(conn);
             return;
         }
 
         char address[50];
         if (::inet_ntop(AF_INET, reinterpret_cast<void *>(rbuf.data() + 4),
                         address, 50) == nullptr) {
-            server_->closeConn(conn);
             return;
         }
 
@@ -45,7 +43,7 @@ public:
         string port =
             to_string(ntohs(*reinterpret_cast<uint16_t *>(rbuf.data() + 2)));
 
-        info("name : %s, port : %s", name.data(), port.data());
+        info("setName : %s, setPort : %s", name.data(), port.data());
 
         rbuf.retrieve();
 
@@ -53,7 +51,7 @@ public:
             loop_->creatTcpClient(conn->getPoller(), name, port);
         TimerId id = cl->runAfter(
             Timestamp(8, 0), [cl] { error("fd %d timeout", cl->clientfd()); });
-        cl->setConnectorCallback(
+        cl->onConnect(
             [this, conn, id](shared_ptr<Connection> conn2) {
                 conn->udata_ = new shared_ptr<Connection>(conn2);
                 conn2->udata_ = new shared_ptr<Connection>(conn);
@@ -66,13 +64,13 @@ public:
                 response[1] = 0x5A;
                 conn->send(response, 8);
             });
-        cl->setReadEventCallback(
+        cl->onRead(
             bind(&TcpProxy::onReadEventCallback, this, std::placeholders::_1));
-        cl->setErroEventCallback(
+        cl->onErro(
             bind(&TcpProxy::onErroEventCallback, this, std::placeholders::_1));
         cl->start();
-        conn->setReadCallback(
-            bind(&TcpProxy::onReadEventCallback, this, std::placeholders::_1));
+        conn->onRead(
+                bind(&TcpProxy::onReadEventCallback, this, std::placeholders::_1));
         conn->suspendRead();
     }
     void onReadEventCallback(shared_ptr<Connection> conn) {

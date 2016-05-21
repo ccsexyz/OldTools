@@ -1,5 +1,8 @@
 #include "EventLoop.h"
+#include "Channel.h"
 #include "Poller.h"
+#include "ServerSocket.h"
+#include "Socket.h"
 #include "TcpClient.h"
 #include "TcpServer.h"
 #include <signal.h>
@@ -77,37 +80,46 @@ std::shared_ptr<Poller> &EventLoop::getSuitablePoller(int fd) {
 std::shared_ptr<TcpClient>
 EventLoop::creatTcpClient(const std::string &server_path,
                           const std::string &server_port) {
+    auto s = std::make_shared<Socket>();
     TcpClientPtr client;
     try {
-        client = std::make_shared<TcpClient>(server_path, server_port);
-        client->setPoller(pollers_[client->clientfd() % (N + 1)].get());
-        client->setEventLoop(this);
-    } catch(const BaseException &e) {
-        debug("%s", e.what().data());
-    }
+        s->setName(server_path).setPort(server_port).connect();
+        client = std::make_shared<TcpClient>();
+        client->setPoller(pollers_[client->clientfd() % (N + 1)].get())
+            .setEventLoop(this)
+            .setSocket(s.get());
+        ExitCaller::call([s] {});
+    } catch (...) {}
     return client;
 }
 
 std::shared_ptr<TcpClient>
 EventLoop::creatTcpClient(Poller *poller, const std::string &server_path,
                           const std::string &server_port) {
+    auto s = std::make_shared<Socket>();
     TcpClientPtr client;
     try {
-        client = std::make_shared<TcpClient>(server_path, server_port);
-        client->setPoller(poller);
-        client->setEventLoop(this);
-    } catch(const BaseException &e) {
-        debug("%s", e.what().data());
-    }
+        s->setName(server_path).setPort(server_port).connect();
+        client = std::make_shared<TcpClient>();
+        client->setPoller(poller).setEventLoop(this).setSocket(s.get());
+        ExitCaller::call([s] {});
+    } catch (...) {}
     return client;
 }
 
 std::shared_ptr<TcpServer>
 EventLoop::creatTcpServer(const std::string &server_path,
                           const std::string &server_port) {
-    TcpServerPtr server = std::make_shared<TcpServer>(server_path, server_port);
-    server->setPoller(pollers_.front().get());
-    server->setEventLoop(this);
+    auto ss = std::make_shared<ServerSocket>();
+    TcpServerPtr server;
+    try {
+        server = std::make_shared<TcpServer>();
+        ss->setName(server_path).setPort(server_port).listen();
+        server->setEventLoop(this)
+            .setPoller(pollers_.front().get())
+            .setServerSocket(ss.get());
+        ExitCaller::call([ss] {});
+    } catch (...) {}
     return server;
 }
 

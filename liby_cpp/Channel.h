@@ -1,21 +1,20 @@
 #ifndef POLLERTEST_CHANEL_H
 #define POLLERTEST_CHANEL_H
 
-#include "File.h"
+#include "FileDescriptor.h"
 #include "util.h"
 
 namespace Liby {
-class Poller;
 
-class Chanel final : clean_ {
+class Channel final : clean_ {
 public:
     static const int kRead_ = 0x1;
     static const int kWrit_ = 0x2;
     static const int kErro_ = 0x4;
 
-    Chanel() = default;
-    Chanel(Poller *poller, FilePtr fp) : fp_(fp), poller_(poller) {}
-    ~Chanel();
+    Channel() = default;
+    Channel(Poller *poller, FilePtr fp) : fp_(fp), poller_(poller) {}
+    ~Channel();
 
     void updateRevents(int revents) { revents_ = revents; }
     void setEvents(int events) { events_ = events; }
@@ -28,41 +27,53 @@ public:
 
     FilePtr &filePtr() { return fp_; }
 
-    void setPoller(Poller *poller) { poller_ = poller; }
-    void setFilePtr(FilePtr fp) { fp_ = fp; }
-    void enableRead(bool flag = true) {
+    Channel &setPoller(Poller *poller) {
+        poller_ = poller;
+        return *this;
+    }
+    Channel &setFilePtr(FilePtr fp) {
+        fp_ = fp;
+        return *this;
+    }
+    Channel &enableRead(bool flag = true) {
         events_ = flag ? (events_ | kRead_) : (events_ & ~kRead_);
+        return *this;
     }
-    void enableWrit(bool flag = true) {
+    Channel &enableWrit(bool flag = true) {
         events_ = flag ? (events_ | kWrit_) : (events_ & ~kWrit_);
+        return *this;
     }
-    void enableErro(bool flag = true) {
+    Channel &enableErro(bool flag = true) {
         events_ = flag ? (events_ | kErro_) : (events_ & ~kErro_);
+        return *this;
     }
 
-    bool canRead() const { return events_ & kRead_; }
-    bool canWrit() const { return events_ & kWrit_; }
+    bool canRead() const { return (events_ & kRead_) != 0; }
+    bool canWrit() const { return (events_ & kWrit_) != 0; }
 
     void removeChanel();
     void updateChanel();
     void addChanel();
 
-    void setReadEventCallback(const BasicHandler &cb) {
+    Channel &onRead(const BasicHandler &cb) {
         readEventCallback_ = cb;
+        return *this;
     }
-    void setWritEventCallback(const BasicHandler &cb) {
+    Channel &onWrit(const BasicHandler &cb) {
         writEventCallback_ = cb;
+        return *this;
     }
-    void setErroEventCallback(const BasicHandler &cb) {
+    Channel &onErro(const BasicHandler &cb) {
         erroEventCallback_ = cb;
+        return *this;
     }
 
     void handleEvent();
 
 private:
     bool isError() const { return revents_ & kErro_ || events_ & kErro_; }
-    bool Readable() const { return revents_ & kRead_; }
-    bool Writable() const { return revents_ & kWrit_; }
+    bool Readable() const { return (revents_ & kRead_) != 0; }
+    bool Writable() const { return (revents_ & kWrit_) != 0; }
 
 private:
     BasicHandler readEventCallback_;
@@ -75,7 +86,7 @@ private:
     int savedEvents_ = 0;
     int revents_ = 0; // update by poller
 };
-using ChanelPtr = std::shared_ptr<Chanel>;
+using ChanelPtr = std::shared_ptr<Channel>;
 }
 
 #endif // POLLERTEST_CHANEL_H

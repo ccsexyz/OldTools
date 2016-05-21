@@ -7,8 +7,6 @@
 #include <set>
 
 namespace Liby {
-class Chanel;
-class Poller;
 
 using TimerId = uint64_t;
 
@@ -61,7 +59,7 @@ private:
 private:
 #ifdef __linux__
     int timerfd_;
-    std::unique_ptr<Chanel> timerChan_;
+    std::unique_ptr<Channel> timerChan_;
 #endif
     Poller *poller_;
     Liby::BinaryHeap<Timer> queue_;

@@ -1,11 +1,12 @@
 #include "HttpServer.h"
 #include "../Connection.h"
-#include "../File.h"
+#include "../FileDescriptor.h"
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+//#include "../TcpServer.h"
 
 using namespace Liby;
 using namespace Liby::http;
@@ -17,14 +18,10 @@ HttpServer::HttpServer(const std::string &root,
 }
 
 void HttpServer::start() {
-    http_server_->setReadEventCallback(std::bind(
-        &HttpServer::onReadEventCallback, this, std::placeholders::_1));
-    http_server_->setWriteAllCallback(std::bind(&HttpServer::onWriteAllCallback,
-                                                this, std::placeholders::_1));
-    http_server_->setAcceptorCallback(std::bind(
-        &HttpServer::onAcceptEventCallback, this, std::placeholders::_1));
-    http_server_->setErroEventCallback(std::bind(
-        &HttpServer::onErroEventCallback, this, std::placeholders::_1));
+    http_server_->onRead([this](std::shared_ptr<Connection> conn){onReadEventCallback(conn);});
+    http_server_->onWritAll([this](std::shared_ptr<Connection> conn){onWriteAllCallback(conn);});
+    http_server_->onAccept([this](std::shared_ptr<Connection> conn){onAcceptEventCallback(conn);});
+    http_server_->onErro([this](std::shared_ptr<Connection> conn){onErroEventCallback(conn);});
     http_server_->start();
 }
 
@@ -33,7 +30,7 @@ void HttpServer::onAcceptEventCallback(std::shared_ptr<Connection> conn) {
     HttpContext *cxt = new (std::nothrow) HttpContext;
     if (cxt == nullptr) {
         error("alloc error");
-        http_server_->closeConn(conn);
+//        http_server_->closeConn(conn);
         conn->destroy();
     } else {
         conn->udata_ = reinterpret_cast<void *>(cxt);
@@ -69,7 +66,7 @@ void HttpServer::onReadEventCallback(std::shared_ptr<Connection> conn) {
             if (filesize == -1 || fd < 0) {
                 rep.status_ = Reply::NOT_FOUND;
             } else {
-                rep.filefp_ = std::make_shared<File>(fd);
+                rep.filefp_ = std::make_shared<FileDescriptor>(fd);
                 rep.filesize_ = filesize;
                 rep.filefd_ = fd;
                 rep.status_ = Reply::OK;
@@ -97,7 +94,7 @@ void HttpServer::onWriteAllCallback(std::shared_ptr<Connection> conn) {
     HttpContext *context = reinterpret_cast<HttpContext *>(conn->udata_);
     if (context->keep_alive_ == false) {
         delete context;
-        http_server_->closeConn(conn);
+//        http_server_->closeConn(conn);
         conn->destroy();
     }
 }

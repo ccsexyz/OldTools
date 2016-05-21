@@ -214,9 +214,7 @@ void Buffer::resize(off_t minSize) {
     capacity_ = minSize;
 }
 
-void Buffer::retrieve() {
-    leftIndex_ = rightIndex_ = 0;
-}
+void Buffer::retrieve() { leftIndex_ = rightIndex_ = 0; }
 
 void Buffer::retrieve(off_t len) {
     assert(len >= 0);

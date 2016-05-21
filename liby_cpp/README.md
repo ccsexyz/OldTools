@@ -10,7 +10,7 @@ using namespace Liby;
 int main() {
     EventLoop loop;
     auto echo_server = loop.creatTcpServer("localhost", "9377");
-    echo_server->setReadEventCallback([](std::shared_ptr<Connection> &&conn) {
+    echo_server->onRead([](std::shared_ptr<Connection> &&conn) {
         conn->send(conn->read());
     });
     loop.RunMainLoop();
@@ -25,7 +25,7 @@ int main() {
 
 ####主动关闭连接
 ```c++
-    echo_server->setReadEventCallback([](std::shared_ptr<Connection> &&conn) {
+    echo_server->onRead([](std::shared_ptr<Connection> &&conn) {
         conn->destroy();
     });
 ```

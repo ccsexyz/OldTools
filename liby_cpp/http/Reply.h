@@ -7,7 +7,7 @@
 
 namespace Liby {
 
-class File;
+class FileDescriptor;
 namespace http {
 
 struct Reply final {
@@ -29,7 +29,7 @@ struct Reply final {
     const static int BAD_GATEWAY;
     const static int SERVICE_UNAVAILABLE;
 
-    std::shared_ptr<File> filefp_;
+    std::shared_ptr<FileDescriptor> filefp_;
     long filesize_ = -1;
     int filefd_ = -1;
     int status_;

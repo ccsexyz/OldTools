@@ -1,62 +1,48 @@
 #include "TcpClient.h"
-#include "Chanel.h"
+#include "Channel.h"
 #include "Connection.h"
-#include "EventLoop.h"
-#include "File.h"
-#include "Poller.h"
+#include "Socket.h"
 
-using namespace Liby;
-
-TcpClient::TcpClient(const std::string &server_path,
-                     const std::string &server_port) {
-    clientfp_ = File::async_connect(server_path, server_port);
-    clientfd_ = clientfp_->fd();
-    if(clientfd_ < 0) {
-        throw BaseException("clientfd < 0");
-    }
-    chan_ = std::make_shared<Chanel>();
-    chan_->setFilePtr(clientfp_);
-}
-
-void TcpClient::start() {
-    chan_->setPoller(poller_);
-    chan_->enableRead(false);
-    chan_->enableWrit();
-    chan_->setWritEventCallback([this] {
-        conn_ = std::make_shared<Connection>(poller_, clientfp_);
-        conn_->udata_ = udata_;
-        conn_->setWritCallback(writeAllCallback_);
-        conn_->setReadCallback(readEventCallback_);
-        conn_->setErroCallback(erroEventCallback_);
-        poller_->runEventHandler([this] {
-            conn_->init();
-            if (connector_) {
-                connector_(conn_);
-            }
-        });
-        chan_.reset();
-    });
-    chan_->setErroEventCallback([this] {
-        if (erroEventCallback_) {
-            erroEventCallback_(std::shared_ptr<Connection>());
-        }
-        destroy();
-    });
-    chan_->addChanel();
-}
-
-void TcpClient::runAsyncHandler(BasicHandler cb) {
-    assert(loop_);
-    loop_->getFirstPoller()->runEventHandler(cb);
-}
-
-void TcpClient::destroy() {
-    clientfp_.reset();
+void Liby::TcpClient::destroy() {
     chan_.reset();
-    conn_.reset();
     connector_ = nullptr;
     readEventCallback_ = nullptr;
     writeAllCallback_ = nullptr;
     erroEventCallback_ = nullptr;
     cancelAllTimer();
+}
+
+void Liby::TcpClient::start() {
+    assert(loop_ && socket_ && poller_);
+    chan_ = std::move(std::make_unique<Channel>(poller_, clientfp_));
+    chan_->enableRead(false)
+        .enableWrit()
+        .onWrit([this] {
+            ConnPtr conn_ = std::make_shared<Connection>(poller_, clientfp_);
+            conn_->udata_ = udata_;
+            conn_->onWrit(writeAllCallback_);
+            conn_->onRead(readEventCallback_);
+            conn_->onErro(erroEventCallback_);
+            poller_->runEventHandler([this, conn_] {
+                conn_->init();
+                if (connector_) {
+                    connector_(conn_);
+                }
+            });
+            chan_.reset();
+        })
+        .onErro([this] {
+            if (erroEventCallback_) {
+                erroEventCallback_(std::shared_ptr<Connection>());
+            }
+            destroy();
+        })
+        .addChanel();
+}
+
+Liby::TcpClient &Liby::TcpClient::setSocket(Socket *s) {
+    socket_ = s;
+    clientfp_ = s->getFilePtr();
+    clientfd_ = clientfp_->fd();
+    return *this;
 }

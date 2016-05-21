@@ -15,10 +15,6 @@
 #include <vector>
 
 namespace Liby {
-class File;
-class Chanel;
-class EventQueue;
-class TimerQueue;
 
 using TimerId = uint64_t;
 
@@ -26,9 +22,9 @@ class Poller : clean_ {
 public:
     Poller();
     virtual ~Poller();
-    virtual void addChanel(Chanel *) = 0;
-    virtual void updateChanel(Chanel *) = 0;
-    virtual void removeChanel(Chanel *) = 0;
+    virtual void addChanel(Channel *) = 0;
+    virtual void updateChanel(Channel *) = 0;
+    virtual void removeChanel(Channel *) = 0;
     virtual void loop_once() = 0;
 
 #ifdef __APPLE__
@@ -62,9 +58,9 @@ public:
     PollerEpoll();
 
     void loop_once() override;
-    void addChanel(Chanel *chan) override;
-    void updateChanel(Chanel *chan) override;
-    void removeChanel(Chanel *chan) override;
+    void addChanel(Channel *chan) override;
+    void updateChanel(Channel *chan) override;
+    void removeChanel(Channel *chan) override;
 
 #ifdef __linux__
     int pollerfd() {
@@ -77,12 +73,12 @@ private:
         assert(events_.size() > 0);
         return &events_[0];
     }
-    void translateEvents(struct epoll_event &event, Chanel *chan);
+    void translateEvents(struct epoll_event &event, Channel *chan);
 
 private:
     int pollerfd_ = -1;
     size_t eventsSize_ = 0;
-    std::shared_ptr<File> pollerfp_;
+    std::shared_ptr<FileDescriptor> pollerfp_;
     std::vector<struct epoll_event> events_;
 #endif
 };
@@ -92,14 +88,14 @@ public:
     PollerSelect();
 
     void loop_once() override;
-    void addChanel(Chanel *chan) override;
-    void updateChanel(Chanel *chan) override;
-    void removeChanel(Chanel *chan) override;
+    void addChanel(Channel *chan) override;
+    void updateChanel(Channel *chan) override;
+    void removeChanel(Channel *chan) override;
 
 private:
     fd_set rset_, wset_;
     int maxfd_ = -1;
-    std::vector<Chanel *> chanels_;
+    std::vector<Channel *> chanels_;
 };
 
 class PollerPoll : public Poller {
@@ -109,9 +105,9 @@ public:
     PollerPoll();
 
     void loop_once() override;
-    void addChanel(Chanel *chan) override;
-    void updateChanel(Chanel *chan) override;
-    void removeChanel(Chanel *chan) override;
+    void addChanel(Channel *chan) override;
+    void updateChanel(Channel *chan) override;
+    void removeChanel(Channel *chan) override;
 
 private:
     struct pollfd *getPollfdPtr() {
@@ -122,15 +118,15 @@ private:
 private:
     // int eventsSize_ = 0;
     std::vector<struct pollfd> pollfds_;
-    std::unordered_map<int, Chanel *> chanels_;
+    std::unordered_map<int, Channel *> chanels_;
 };
 
 class PollerKevent : public Poller {
 public:
     PollerKevent();
-    void addChanel(Chanel *) override;
-    void updateChanel(Chanel *) override;
-    void removeChanel(Chanel *) override;
+    void addChanel(Channel *) override;
+    void updateChanel(Channel *) override;
+    void removeChanel(Channel *) override;
     void loop_once() override;
 
 #ifdef __APPLE__
@@ -139,8 +135,8 @@ private:
 
 private:
     int kq_ = -1;
-    int eventsSize_ = 0;
-    std::shared_ptr<File> keventPtr_;
+    size_t eventsSize_ = 0;
+    std::shared_ptr<FileDescriptor> keventPtr_;
     std::vector<struct kevent> events_;
     std::vector<struct kevent> changes_;
 #endif

@@ -7,10 +7,11 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <type_traits>
-#include <utility>
 #include <unordered_set>
+#include <utility>
 
 #if __cplusplus < 201402L
 // support make_unique in c++ 11
@@ -37,10 +38,31 @@ make_unique(Args &&...) = delete;
 #endif
 
 namespace Liby {
+class io_task;
+class Buffer;
+class FileDescriptor;
+class Socket;
+class Poller;
+class PollerEpoll;
+class PollerPoll;
+class PollerSelect;
+class Channel;
+class EventLoop;
+class TcpClient;
+class TcpServer;
+class Connection;
+class ServerSocket;
+class EventQueue;
+class TimerQueue;
 
+using FilePtr = std::shared_ptr<FileDescriptor>;
+using TcpClientPtr = std::shared_ptr<TcpClient>;
+using TcpServerPtr = std::shared_ptr<TcpServer>;
 using BasicHandler = std::function<void()>;
+using ConnPtr = std::shared_ptr<Connection>;
+using ConnCallback = std::function<void(std::shared_ptr<Connection>)>;
 
-struct clean_ {
+class clean_ {
 public:
     clean_(const clean_ &) = delete;
 
@@ -49,8 +71,6 @@ public:
     clean_ &operator=(const clean_ &) = delete;
 
     clean_() = default;
-
-    ~clean_() = default;
 };
 
 class DeferCaller final : clean_ {
@@ -133,7 +153,7 @@ public:
     explicit Timestamp(time_t sec, suseconds_t usec) {
         tv_.tv_sec = sec;
         tv_.tv_usec = usec;
-        if (usec > kMicrosecondsPerSecond) {
+        if (static_cast<uint32_t>(usec) > kMicrosecondsPerSecond) {
             tv_.tv_sec += usec / kMicrosecondsPerSecond;
             tv_.tv_usec = usec % kMicrosecondsPerSecond;
         }
@@ -306,15 +326,15 @@ public:
             throw;
 
         class_type *p = this;
-        for(; *str != '\0'; ++str) {
+        for (; *str != '\0'; ++str) {
             int i = conv(*str);
-            if(p->nodes_[i] == nullptr) {
+            if (p->nodes_[i] == nullptr) {
                 p->nodes_[i] = new class_type;
             }
             p = p->nodes_[i];
         }
 
-        if(p->element_ == nullptr) {
+        if (p->element_ == nullptr) {
             p->element_ = new T;
         }
         return *(p->element_);
@@ -325,14 +345,14 @@ public:
             return false;
 
         class_type *p = this;
-        for(; *str != '\0'; ++str) {
+        for (; *str != '\0'; ++str) {
             int i = conv(*str);
-            if(p->nodes_[i] == nullptr)
+            if (p->nodes_[i] == nullptr)
                 return false;
             p = p->nodes_[i];
         }
 
-        if(p->element_ == nullptr) {
+        if (p->element_ == nullptr) {
             return false;
         } else {
             return true;
@@ -346,15 +366,15 @@ public:
             throw;
 
         class_type *p = this;
-        for(; *str != '\0'; ++str) {
+        for (; *str != '\0'; ++str) {
             int i = conv(*str);
-            if(p->nodes_[i] == nullptr) {
+            if (p->nodes_[i] == nullptr) {
                 p->nodes_[i] = new class_type;
             }
             p = p->nodes_[i];
         }
 
-        if(p->element_ == nullptr) {
+        if (p->element_ == nullptr) {
             p->element_ = new T(element);
         } else {
             *(p->element_) = element;
@@ -377,31 +397,34 @@ private:
     Trie<T> **nodes_;
 };
 
+class TimerSet {
+public:
+    using TimerId = uint64_t;
 
-    class Poller;
-    class TimerSet {
-    public:
-        using TimerId = uint64_t;
-        TimerSet(Poller *poller = nullptr)
-            : poller_(poller) {}
-        ~TimerSet() {
-            cancelAllTimer();
-        }
+    TimerSet(Poller *poller = nullptr) : poller_(poller) {}
 
-        void cancelAllTimer();
-        void cancelTimer(TimerId id);
-        TimerId runAt(const Timestamp &timestamp, const BasicHandler &handler);
-        TimerId runAfter(const Timestamp &timestamp, const BasicHandler &handler);
-        TimerId runEvery(const Timestamp &timestamp, const BasicHandler &handler);
+    ~TimerSet() { cancelAllTimer(); }
 
-    protected:
-        void setPoller(Poller *poller) {
-            poller_ = poller;
-        }
+    void cancelAllTimer();
 
-    private:
-        Poller *poller_ = nullptr;
-        std::unordered_set<TimerId> timerIds_;
-    };
+    void cancelTimer(TimerId id);
+
+    TimerId runAt(const Timestamp &timestamp, const BasicHandler &handler);
+
+    TimerId runAfter(const Timestamp &timestamp, const BasicHandler &handler);
+
+    TimerId runEvery(const Timestamp &timestamp, const BasicHandler &handler);
+
+protected:
+    void setPoller(Poller *poller) { poller_ = poller; }
+
+private:
+    Poller *poller_ = nullptr;
+    std::unordered_set<TimerId> timerIds_;
+};
+
+void set_noblock(int fd, bool flag = true) noexcept;
+
+void set_nonagle(int fd, bool flag = true) noexcept;
 }
 #endif // LIBY_UTIL_H

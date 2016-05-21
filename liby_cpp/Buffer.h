@@ -75,7 +75,7 @@ private:
     off_t capacity_ = 0;
 };
 
-class File;
+class FileDescriptor;
 
 struct io_task final {
     // for sendfile
@@ -83,7 +83,7 @@ struct io_task final {
     io_task() = default;
     io_task(const io_task &that);
 
-    std::shared_ptr<File> fp_;
+    std::shared_ptr<FileDescriptor> fp_;
     off_t offset_ = 0;
     off_t len_ = 0;
 

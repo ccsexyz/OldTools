@@ -4,6 +4,9 @@
 #include "BlockingQueue.h"
 #include <string>
 
+#define verbose(fmt, ...)                                                      \
+    Liby::Logger::getLogger().log(Logger::LogLevel::VERBOSE, __FILE__,         \
+                                  __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define debug(fmt, ...)                                                        \
     Liby::Logger::getLogger().log(Logger::LogLevel::DEBUG, __FILE__, __LINE__, \
                                   __func__, fmt, ##__VA_ARGS__)
@@ -52,7 +55,7 @@
 namespace Liby {
 class Logger final {
 public:
-    enum class LogLevel { DEBUG, INFO, WARN, ERROR, FATAL };
+    enum class LogLevel { VERBOSE, DEBUG, INFO, WARN, ERROR, FATAL };
 
     Logger(const Logger &) = delete;
     Logger(Logger &&) = delete;
@@ -73,7 +76,7 @@ public:
     static std::string getTimeStr();
 
 private:
-    Logger(LogLevel level = LogLevel::INFO);
+    Logger(LogLevel level = LogLevel::DEBUG);
 
     void logger_thread();
 

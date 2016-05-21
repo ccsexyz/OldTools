@@ -5,10 +5,6 @@
 #include "util.h"
 
 namespace Liby {
-class File;
-class Chanel;
-class Poller;
-
 class EventQueue : clean_ {
 public:
     EventQueue(Poller *poller);
@@ -22,12 +18,12 @@ public:
 private:
     Poller *poller_;
     int eventfd_ = -1;
-    std::shared_ptr<File> eventfp_;
+    std::shared_ptr<FileDescriptor> eventfp_;
 #ifdef __APPLE__
     int event2fd_ = -1;
-    std::shared_ptr<File> event2fp_;
+    std::shared_ptr<FileDescriptor> event2fp_;
 #endif
-    std::unique_ptr<Chanel> eventChanelPtr_;
+    std::unique_ptr<Channel> eventChanelPtr_;
     std::unique_ptr<BlockingQueue<BasicHandler>>
         eventHandlersPtr_; // BlockingQueue is nocopyable, so use smart-pointer
 };

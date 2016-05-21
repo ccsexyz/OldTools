@@ -1,92 +1,71 @@
 #include "TcpServer.h"
-#include "Chanel.h"
+#include "Channel.h"
 #include "Connection.h"
-#include "EventLoop.h"
-#include "File.h"
-#include "Poller.h"
+#include "ServerSocket.h"
 
-using namespace Liby;
-
-TcpServer::TcpServer(const std::string &server_path,
-                     const std::string server_port) {
-    listenfp_ = File::initserver(server_path, server_port);
-    if (!listenfp_) {
-        throw BaseException(__FILE__, __LINE__, "initserver error");
-    }
-    listenfd_ = listenfp_->fd();
-    chan_ = std::make_shared<Chanel>();
-    chan_->setFilePtr(listenfp_);
+void Liby::TcpServer::start() {
+    assert(serverSocket_ && loop_ && poller_);
+    chan_ = std::move(std::make_unique<Channel>(poller_, listenfp_));
+    chan_->enableRead(true)
+        .onRead([this] { handleAcceptEvent(); })
+        .onErro([this] { handleErroEvent(); })
+        .addChanel();
 }
 
-void TcpServer::start() {
-    chan_->enableRead();
-    chan_->setPoller(poller_);
-    chan_->setReadEventCallback(std::bind(&TcpServer::handleAcceptEvent, this));
-    chan_->setErroEventCallback(std::bind(&TcpServer::handleErroEvent, this));
-    chan_->addChanel();
+void Liby::TcpServer::initConnection(ConnPtr &connPtr) {
+    connPtr->onRead(readEventCallback_)
+        .onWrit(writAllCallback_)
+        .onErro([this](ConnPtr conn) { handleErroEventOfConn(conn); });
 }
 
-void TcpServer::handleAcceptEvent() {
-    auto ret = listenfp_->accept();
-    for (auto x : ret) {
-        if (x->fd() == -1) {
+void Liby::TcpServer::handleAcceptEvent() {
+    assert(listenfd_ >= 0);
+    for (;;) {
+        int clfd = ::accept(listenfd_, NULL, NULL);
+        if (clfd < 0) {
+            if (errno == EAGAIN) {
+                break;
+            } else if (errno == EINTR) {
+                continue;
+            }
             handleErroEvent();
             return;
         }
-
-        std::shared_ptr<Connection> connPtr = std::make_shared<Connection>(
-            loop_->getSuitablePoller(x->fd()).get(), x);
-        {
-            std::unique_lock<std::mutex> G_(m_);
-            conns_[x->fd()] = connPtr;
-        }
-        initConnection(connPtr);
-        connPtr->runEventHandler([this, connPtr] {
-            connPtr->init();
-            if (acceptorCallback_)
-                acceptorCallback_(connPtr);
-        });
+        handleAcceptFd(clfd);
     }
 }
 
-void TcpServer::handleErroEvent() {
-    listenfd_ = -1;
-    listenfp_.reset();
+void Liby::TcpServer::handleAcceptFd(int fd) {
+    assert(fd >= 0);
+    std::shared_ptr<Connection> connPtr =
+        std::make_shared<Connection>(loop_->getSuitablePoller(fd).get(),
+                                     std::make_shared<FileDescriptor>(fd));
+    initConnection(connPtr);
+    connPtr->runEventHandler([this, connPtr] {
+        connPtr->init();
+        if (acceptorCallback_)
+            acceptorCallback_(connPtr);
+    });
+}
+
+void Liby::TcpServer::handleErroEvent() {
     chan_.reset();
+    acceptorCallback_ = nullptr;
+    readEventCallback_ = nullptr;
+    writAllCallback_ = nullptr;
+    erroEventCallback_ = nullptr;
 }
 
-void TcpServer::initConnection(std::shared_ptr<Connection> &connPtr) {
-    connPtr->setErroCallback(std::bind(&TcpServer::handleErroEventOfConn, this,
-                                       std::placeholders::_1));
-    connPtr->setReadCallback(readEventCallback_);
-    connPtr->setWritCallback(writeAllCallback_);
-}
-
-void TcpServer::handleErroEventOfConn(std::shared_ptr<Connection> connPtr) {
+void Liby::TcpServer::handleErroEventOfConn(ConnPtr connPtr) {
     if (erroEventCallback_) {
-        erroEventCallback_((connPtr));
+        erroEventCallback_(connPtr);
     }
-    closeConn(connPtr);
     connPtr->destroy();
 }
 
-void TcpServer::closeConn(std::shared_ptr<Connection> connPtr) {
-    std::unique_lock<std::mutex> G_(m_);
-    auto k_ = conns_.find(connPtr->getConnfd());
-    if (k_ != conns_.end())
-        conns_.erase(k_);
-}
-
-void TcpServer::runHanlderOnConns(
-    std::function<void(std::shared_ptr<Connection>)> cb) {
-    if (!cb) {
-        error("empty ConnCallback\n");
-        return;
-    }
-    std::unique_lock<std::mutex> G_(m_);
-    for (auto &x : conns_) {
-        if (x.second) {
-            cb(x.second);
-        }
-    }
+Liby::TcpServer &Liby::TcpServer::setServerSocket(ServerSocket *serverSocket) {
+    serverSocket_ = serverSocket;
+    listenfp_ = serverSocket_->getFilePtr();
+    listenfd_ = listenfp_->fd();
+    return *this;
 }

@@ -5,11 +5,11 @@ using namespace Liby;
 
 int main() {
     // Logger::setLevel(Logger::LogLevel::DEBUG);
-    EventLoop loop(0, "EPOLL");
+    EventLoop loop(8, "EPOLL");
     auto echo_server = loop.creatTcpServer("localhost", "9377");
-    echo_server->setAcceptorCallback(
+    echo_server->onAccept(
         [](std::shared_ptr<Connection> conn) { conn->suspendRead(false); });
-    echo_server->setReadEventCallback(
+    echo_server->onRead(
         [](std::shared_ptr<Connection> conn) { conn->send(conn->read()); });
     echo_server->start();
     loop.RunMainLoop();

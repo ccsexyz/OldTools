@@ -1,7 +1,7 @@
 #ifndef POLLERTEST_LIBY_H
 #define POLLERTEST_LIBY_H
 
-#include "Chanel.h"
+#include "Channel.h"
 #include "Connection.h"
 #include "EventLoop.h"
 #include "Poller.h"

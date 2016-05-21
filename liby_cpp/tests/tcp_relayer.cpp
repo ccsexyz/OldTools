@@ -14,11 +14,11 @@ public:
     }
 
     void start() {
-        server_->setAcceptorCallback(
+        server_->onAccept(
             bind(&TcpRelayer::onAcceptEvent, this, std::placeholders::_1));
-        server_->setReadEventCallback(bind(&TcpRelayer::onReadEventCallback,
+        server_->onRead(bind(&TcpRelayer::onReadEventCallback,
                                            this, std::placeholders::_1));
-        server_->setErroEventCallback(bind(&TcpRelayer::onErroEventCallback,
+        server_->onErro(bind(&TcpRelayer::onErroEventCallback,
                                            this, std::placeholders::_1));
         server_->start();
     }
@@ -31,7 +31,7 @@ public:
         TimerId id = cl->runAfter(Timestamp(50, 0), [cl] {
             // timeout
         });
-        cl->setConnectorCallback(
+        cl->onConnect(
             [weak_conn, this, id](shared_ptr<Connection> conn) {
                 if (weak_conn.expired())
                     return;
@@ -42,9 +42,9 @@ public:
                 conn2->suspendRead(false);
                 conn->getPoller()->cancelTimer(id);
             });
-        cl->setReadEventCallback(bind(&TcpRelayer::onReadEventCallback, this,
+        cl->onRead(bind(&TcpRelayer::onReadEventCallback, this,
                                       std::placeholders::_1));
-        cl->setErroEventCallback(bind(&TcpRelayer::onErroEventCallback, this,
+        cl->onErro(bind(&TcpRelayer::onErroEventCallback, this,
                                       std::placeholders::_1));
         cl->start();
     }
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     Logger::setLevel(Logger::LogLevel::DEBUG);
     try {
         if (argc != 4) {
-            throw BaseException("usage: ./tcp_relayer name port listenport");
+            throw BaseException("usage: ./tcp_relayer setName setPort listenport");
         }
         EventLoop loop;
         TcpRelayer relayer(&loop, argv[1], argv[2], argv[3]);

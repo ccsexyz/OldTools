@@ -7,12 +7,6 @@
 #include <vector>
 
 namespace Liby {
-class Poller;
-class PollerEpoll;
-class PollerPoll;
-class PollerSelect;
-class TcpServer;
-class TcpClient;
 
 class EventLoop final : clean_ {
 public:

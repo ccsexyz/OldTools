@@ -1,6 +1,6 @@
 #include "TimerQueue.h"
-#include "Chanel.h"
-#include "File.h"
+#include "Channel.h"
+#include "FileDescriptor.h"
 #include "Logger.h"
 #include "Poller.h"
 #include <string.h>
@@ -12,15 +12,16 @@
 
 using namespace Liby;
 
-std::atomic<uint64_t> Timer::timerIds_(1); // tiemrId will never be zero, so zero timerId is invalid
+std::atomic<uint64_t> Timer::timerIds_(
+    1); // tiemrId will never be zero, so zero timerId is invalid
 
 TimerQueue::TimerQueue(Poller *poller) : poller_(poller) {
 #ifdef __linux__
     fatalif(poller_ == nullptr, "Poller cannot be nullptr");
     timerfd_ = ::timerfd_create(CLOCK_REALTIME, TFD_CLOEXEC | TFD_NONBLOCK);
     fatalif(timerfd_ < 0, "timerfd_create: %s", ::strerror(errno));
-    auto timerfp_ = std::make_shared<File>(timerfd_);
-    timerChan_ = std::make_unique<Chanel>(poller_, timerfp_);
+    auto timerfp_ = std::make_shared<FileDescriptor>(timerfd_);
+    timerChan_ = std::make_unique<Channel>(poller_, timerfp_);
 #endif
 }
 
@@ -47,8 +48,8 @@ void TimerQueue::updateTimerfd(const Timestamp &timeout) {
 void TimerQueue::start() {
 #ifdef __linux__
     timerChan_->enableRead();
-    timerChan_->setErroEventCallback([this] { destroy(); });
-    timerChan_->setReadEventCallback([this] {
+    timerChan_->onErro([this] { destroy(); });
+    timerChan_->onRead([this] {
         if (timerfd_ < 0) {
             error("timerfd < 0");
         }
@@ -75,7 +76,7 @@ void TimerQueue::destroy() {
 }
 
 void TimerQueue::cancel(TimerId id) {
-    if(id == 0)
+    if (id == 0)
         return;
     queue_.erase_if([id](const Timer &timer) { return timer.id() == id; });
 }
@@ -94,10 +95,10 @@ void TimerQueue::handleTimeoutEvents() {
         if (now < minTimer.timeout()) {
             break;
         }
-//        minTimer.runHandler();
+        //        minTimer.runHandler();
         auto savedMinTimer = minTimer;
         // warning : minTimer handler may delete itself, so make a copy
-        debug("delete timer id = %lu\n", minTimer.id());
+        verbose("delete timer id = %lu\n", minTimer.id());
         queue_.delete_min();
         savedMinTimer.runHandler();
     }
@@ -107,8 +108,8 @@ void TimerQueue::handleTimeoutEvents() {
 }
 
 void TimerQueue::insert(const Timer &timer) {
-    debug("add timer id = %lu", timer.id());
-    if(timer.id() == 0) // ignore all timer which id is zero
+    verbose("add timer id = %lu", timer.id());
+    if (timer.id() == 0) // ignore all timer which id is zero
         return;
     if (queue_.empty()) {
         updateTimerfd(timer.timeout());
