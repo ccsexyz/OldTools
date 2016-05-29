@@ -21,7 +21,7 @@ public:
 
 protected:
     int fd_ = -1;
-    uint32_t opt_ = SocketOption::Nonblock;
+    uint32_t opt_ = SocketOption::Nonblock | SocketOption::Nonagle;
     FilePtr fp_;
     std::string name_;
     std::string port_;

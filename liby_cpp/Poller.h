@@ -2,6 +2,7 @@
 #define POLLERTEST_POLLER_H
 
 #include "BlockingQueue.h"
+#include "Channel.h"
 #include "util.h"
 #include <atomic>
 #ifdef __linux__
@@ -42,6 +43,10 @@ public:
 
     void runEventHandler(const BasicHandler &handler);
 
+    Channel *getChannel(int fd) { return channels_[fd]; }
+
+    void setChannel(int fd, Channel *ch) { channels_[fd] = ch; }
+
 private:
     void runEveryHelper(TimerId id, const Timestamp &timestamp,
                         const BasicHandler &handler);
@@ -49,6 +54,7 @@ private:
 private:
     std::unique_ptr<EventQueue> eventQueue_;
     std::unique_ptr<TimerQueue> timerQueue_;
+    std::vector<Channel *> channels_;
 };
 
 class PollerEpoll : public Poller {
@@ -95,7 +101,7 @@ public:
 private:
     fd_set rset_, wset_;
     int maxfd_ = -1;
-    std::vector<Channel *> chanels_;
+    //    std::vector<Channel *> chanels_;
 };
 
 class PollerPoll : public Poller {
@@ -118,7 +124,7 @@ private:
 private:
     // int eventsSize_ = 0;
     std::vector<struct pollfd> pollfds_;
-    std::unordered_map<int, Channel *> chanels_;
+    //    std::unordered_map<int, Channel *> chanels_;
 };
 
 class PollerKevent : public Poller {

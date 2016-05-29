@@ -18,8 +18,8 @@ Logger::Logger(LogLevel level) : level_(level) {
 }
 
 const char *Logger::getLevelString(LogLevel level) {
-    static const char *levelString_[5] = {"DEBUG", "INFO", "WARN", "ERROR",
-                                          "FATAL"};
+    static const char *levelString_[] = {"VERBOSE", "DEBUG", "INFO",
+                                         "WARN",    "ERROR", "FATAL"};
     return levelString_[static_cast<int>(level)];
 }
 

@@ -148,6 +148,10 @@ public:
 
     Timestamp() : Timestamp(0, 0) {}
 
+    explicit Timestamp(struct timeval *ptv) : tv_(*ptv) {}
+
+    explicit Timestamp(const struct timeval &tv) : tv_(tv) {}
+
     explicit Timestamp(time_t sec) : Timestamp(sec, 0) {}
 
     explicit Timestamp(time_t sec, suseconds_t usec) {
@@ -187,6 +191,8 @@ public:
     uint64_t toMillSec() const {
         return tv_.tv_sec * 1000 + tv_.tv_usec / 1000;
     }
+
+    uint64_t toMicroSec() const { return tv_.tv_sec * 1000000UL + tv_.tv_usec; }
 
     double toSecF() const {
         return static_cast<double>(tv_.tv_usec) / 1000000.0 +
@@ -269,29 +275,17 @@ public:
     static void reset(int signo);
 };
 
-class BaseException {
+class BaseException : public std::exception {
 public:
     BaseException() = delete;
 
-    BaseException(const std::string errmsg)
-        : linenumber_(-1), errmsg_(errmsg) {}
-
-    BaseException(const std::string &filename, int linenumber,
-                  const std::string errmsg)
-        : linenumber_(linenumber), filename_(filename), errmsg_(errmsg) {}
+    BaseException(const std::string &errmsg) : errmsg_(errmsg) {}
 
     virtual ~BaseException() = default;
 
-    std::string what() const {
-        if (linenumber_ >= 0)
-            return filename_ + std::to_string(linenumber_) + errmsg_;
-        else
-            return errmsg_;
-    }
+    const char *what() const noexcept override { return errmsg_.data(); }
 
 private:
-    int linenumber_;
-    std::string filename_;
     std::string errmsg_;
 };
 
@@ -426,5 +420,7 @@ private:
 void set_noblock(int fd, bool flag = true) noexcept;
 
 void set_nonagle(int fd, bool flag = true) noexcept;
+
+long get_open_max() noexcept;
 }
 #endif // LIBY_UTIL_H

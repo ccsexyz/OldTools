@@ -89,7 +89,7 @@ EventLoop::creatTcpClient(const std::string &server_path,
             .setEventLoop(this)
             .setSocket(s.get());
         ExitCaller::call([s] {});
-    } catch (...) {}
+    } catch (const std::exception &e) { error("%s", e.what()); }
     return client;
 }
 
@@ -103,7 +103,7 @@ EventLoop::creatTcpClient(Poller *poller, const std::string &server_path,
         client = std::make_shared<TcpClient>();
         client->setPoller(poller).setEventLoop(this).setSocket(s.get());
         ExitCaller::call([s] {});
-    } catch (...) {}
+    } catch (const std::exception &e) { error("%s", e.what()); }
     return client;
 }
 
@@ -119,7 +119,7 @@ EventLoop::creatTcpServer(const std::string &server_path,
             .setPoller(pollers_.front().get())
             .setServerSocket(ss.get());
         ExitCaller::call([ss] {});
-    } catch (...) {}
+    } catch (const std::exception &e) { error("%s", e.what()); }
     return server;
 }
 

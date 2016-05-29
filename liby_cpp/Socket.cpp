@@ -16,8 +16,12 @@ void Socket::connect() {
     // TODO:
     // 异步解析
     if ((ret = ::getaddrinfo(name_.data(), port_.data(), &hints, &res)) != 0) {
-        error("getaddrinfo error: %s", ::gai_strerror(ret));
-        throw;
+        std::string errmsg = "getaddrinfo error: ";
+        if (ret != EAI_SYSTEM)
+            errmsg += ::gai_strerror(ret);
+        else
+            errmsg += ::strerror(errno);
+        throw BaseException(errmsg);
     }
 
     DeferCaller defer([res] { ::freeaddrinfo(res); });
@@ -25,7 +29,9 @@ void Socket::connect() {
     int sockfd;
     if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) ==
         -1) {
-        throw;
+        std::string errmsg = "socket error: ";
+        errmsg += ::strerror(errno);
+        throw BaseException(errmsg);
     }
 
     if (opt_ & SocketOption::Nonblock) {
@@ -38,9 +44,10 @@ void Socket::connect() {
 
     ret = ::connect(sockfd, res->ai_addr, res->ai_addrlen);
     if (ret < 0 && errno != EINPROGRESS) {
-        error("connect error: %s\n", ::strerror(errno));
+        std::string errmsg = "connect error: ";
+        errmsg += ::strerror(errno);
         ::close(sockfd);
-        throw;
+        throw BaseException(errmsg);
     }
 
     fp_ = std::make_shared<FileDescriptor>(sockfd);

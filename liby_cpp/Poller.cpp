@@ -17,6 +17,11 @@ using namespace Liby;
 Poller::Poller() {
     eventQueue_ = std::make_unique<EventQueue>(this);
     timerQueue_ = std::make_unique<TimerQueue>(this);
+
+    channels_.resize(get_open_max());
+    for (auto &ch : channels_) {
+        ch = nullptr;
+    }
 }
 
 // 析构函数必须在此定义,否则会导致析构函数找不到EventQueue的定义
@@ -94,7 +99,8 @@ void PollerEpoll::loop_once() {
     int nfds = ::epoll_wait(pollerfd_, getEventsPtr(), events_.size(), -1);
     verbose("nfds = %d events_.size() = %u", nfds, events_.size());
     for (int i = 0; i < nfds; i++) {
-        Channel *ch = reinterpret_cast<Channel *>(events_[i].data.ptr);
+        int fd = events_[i].data.fd;
+        Channel *ch = getChannel(fd);
         // verbose("event in chan %p", ch);
         if (ch == NULL)
             continue;
@@ -117,7 +123,8 @@ void PollerEpoll::loop_once() {
 #ifdef __linux__
 void PollerEpoll::translateEvents(struct epoll_event &event, Channel *chan) {
     assert(chan);
-    event.data.ptr = reinterpret_cast<void *>(chan);
+    //    event.data.ptr = reinterpret_cast<void *>(chan);
+    event.data.fd = chan->getChanelFd();
     event.events = EPOLLHUP;
     if (chan->getEvents() & Channel::kWrit_)
         event.events |= EPOLLOUT;
@@ -135,10 +142,12 @@ void PollerEpoll::addChanel(Channel *chan) {
 
     verbose("add fd = %d, chan = %p\n", chan->getChanelFd(), chan);
 
+    setChannel(chan->getChanelFd(), chan);
+
     int ret =
         ::epoll_ctl(pollerfd_, EPOLL_CTL_ADD, chan->getChanelFd(), &event);
     if (ret < 0)
-        throw BaseException(__FILE__, __LINE__, ::strerror(errno));
+        throw BaseException(::strerror(errno));
 
     eventsSize_++;
 #endif
@@ -152,11 +161,13 @@ void PollerEpoll::removeChanel(Channel *chan) {
 
     verbose("remove fd = %d, chan = %p\n", chan->getChanelFd(), chan);
 
+    setChannel(chan->getChanelFd(), nullptr);
+
     ::epoll_ctl(pollerfd_, EPOLL_CTL_MOD, chan->getChanelFd(), &event);
     int ret =
         ::epoll_ctl(pollerfd_, EPOLL_CTL_DEL, chan->getChanelFd(), &event);
     if (ret < 0)
-        throw BaseException(__FILE__, __LINE__, ::strerror(errno));
+        throw BaseException(::strerror(errno));
 
     eventsSize_--;
 #endif
@@ -167,7 +178,7 @@ void PollerEpoll::updateChanel(Channel *chan) {
     assert(chan && chan->getChanelFd() >= 0);
 
     if (!chan->isEventsChanged()) {
-        // return;
+        return;
     }
 
     struct epoll_event event;
@@ -176,13 +187,11 @@ void PollerEpoll::updateChanel(Channel *chan) {
     int ret =
         ::epoll_ctl(pollerfd_, EPOLL_CTL_MOD, chan->getChanelFd(), &event);
     if (ret < 0)
-        throw BaseException(__FILE__, __LINE__, ::strerror(errno));
+        throw BaseException(::strerror(errno));
 #endif
 }
 
 PollerSelect::PollerSelect() {
-
-    chanels_.resize(48);
     FD_ZERO(&rset_);
     FD_ZERO(&wset_);
 }
@@ -228,10 +237,14 @@ void PollerSelect::loop_once() {
             revent |= Channel::kWrit_;
         }
         if (flag) {
-            verbose("loop onct in fd %d chanel %p", fd, chanels_[fd]);
+            Channel *ch = getChannel(fd);
+            verbose("loop onct in fd %d chanel %p", fd, getChannel(fd));
             ready--;
-            chanels_[fd]->updateRevents(revent);
-            chanels_[fd]->handleEvent();
+
+            if (ch == nullptr)
+                continue;
+            ch->updateRevents(revent);
+            ch->handleEvent();
         }
     }
 }
@@ -241,17 +254,15 @@ void PollerSelect::addChanel(Channel *chan) {
 
     auto fd = chan->getChanelFd();
     if (fd >= FD_SETSIZE) {
-        throw BaseException(__FILE__, __LINE__, "fd >= 1024");
+        throw BaseException("fd >= 1024");
     }
 
     verbose("try to add fd %d chanel %p", fd, chan);
 
     if (fd >= maxfd_) {
         maxfd_ = fd + 1;
-        if (static_cast<decltype(chanels_.size())>(maxfd_) > chanels_.size())
-            chanels_.resize(maxfd_);
     }
-    chanels_[fd] = chan;
+    setChannel(fd, chan);
 
     auto event = chan->getEvents();
     if (event & Channel::kRead_) {
@@ -302,6 +313,8 @@ void PollerSelect::removeChanel(Channel *chan) {
                 break;
         }
     }
+
+    setChannel(fd, nullptr);
 }
 
 PollerPoll::PollerPoll() { pollfds_.resize(defaultPollSize); }
@@ -349,15 +362,13 @@ void PollerPoll::loop_once() {
 
         if (event == 0)
             continue;
-
-        auto k_ = chanels_.find(fd);
-        if (k_ == chanels_.end())
-            continue;
-
-        Channel *chan = k_->second;
-        chan->updateRevents(event);
-        chan->handleEvent();
         ready--;
+
+        Channel *ch = getChannel(fd);
+        if (ch == nullptr)
+            continue;
+        ch->updateRevents(event);
+        ch->handleEvent();
     }
 }
 
@@ -383,7 +394,7 @@ void PollerPoll::addChanel(Channel *chan) {
         pollfds_.resize(fd + 1);
     }
     pollfds_[fd] = pollfd_;
-    chanels_[fd] = chan;
+    setChannel(fd, chan);
 }
 
 void PollerPoll::updateChanel(Channel *chan) {
@@ -421,7 +432,7 @@ void PollerPoll::removeChanel(Channel *chan) {
     assert(chan && chan->getChanelFd() >= 0 && pollfds_.size() > 0);
 
     int fd = chan->getChanelFd();
-    chanels_.erase(fd);
+    setChannel(fd, nullptr);
     pollfds_[fd].fd = -1;
 }
 

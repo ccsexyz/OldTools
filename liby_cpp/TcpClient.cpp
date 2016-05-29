@@ -23,6 +23,8 @@ void Liby::TcpClient::start() {
             conn_->onWrit(writeAllCallback_);
             conn_->onRead(readEventCallback_);
             conn_->onErro(erroEventCallback_);
+            writeAllCallback_ = readEventCallback_ = erroEventCallback_ =
+                nullptr;
             poller_->runEventHandler([this, conn_] {
                 conn_->init();
                 if (connector_) {

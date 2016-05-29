@@ -29,7 +29,7 @@ public:
         readEventCallback_ = cb;
         return *this;
     }
-    TcpClient &onWrit(const ConnCallback &cb) {
+    TcpClient &onWritAll(const ConnCallback &cb) {
         writeAllCallback_ = cb;
         return *this;
     }

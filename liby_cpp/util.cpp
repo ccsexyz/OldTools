@@ -56,7 +56,6 @@ void ExitCaller::callImp(const std::function<void()> &functor) {
 
 void ExitCaller::callOnExit() {
     std::lock_guard<std::mutex> G_(ExitCallerMutex);
-    std::cout << __func__ << std::endl;
     std::for_each(
         ExitCallerFunctors.begin(), ExitCallerFunctors.end(),
         [](decltype(*ExitCallerFunctors.begin()) &functor) { functor(); });
@@ -140,3 +139,5 @@ void Liby::set_nonagle(int fd, bool flag) noexcept {
         fprintf(stderr, "disable nagle error!\n");
     }
 }
+
+long Liby::get_open_max() noexcept { return ::sysconf(_SC_OPEN_MAX); }
