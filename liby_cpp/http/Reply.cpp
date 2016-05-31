@@ -118,6 +118,7 @@ std::string Reply::getMimeType() {
 }
 
 std::string e404(const std::string &filepath) {
+    ClearUnuseVariableWarning(filepath);
     static Reply rep;
     std::string ret = "<h1>404 - Not Found</h1>";
     rep.headers_["Date"] = Timestamp::now().toString();

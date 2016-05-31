@@ -11,7 +11,7 @@ public:
 
     ServerSocket(const std::string &name, const std::string &port) {
         name_ = name;
-        port_ = name;
+        port_ = port;
     }
 
     ServerSocket &setName(const std::string &name) {

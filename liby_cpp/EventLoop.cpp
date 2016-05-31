@@ -24,8 +24,11 @@ EventLoop::EventLoop(int n, PollerChooser chooser) : N(n), chooser_(chooser) {
 }
 
 EventLoop::~EventLoop() {
+    if (async_thread_.joinable())
+        async_thread_.join();
     for (auto &t : threads_) {
-        t.join();
+        if (t.joinable())
+            t.join();
     }
 }
 
@@ -130,4 +133,8 @@ std::shared_ptr<Poller> &EventLoop::getSuitablePoller2(int fd) {
 std::shared_ptr<Poller> &EventLoop::getFirstPoller() {
     assert(pollers_.size() > 0);
     return pollers_.front();
+}
+
+void EventLoop::RunAsyncLoop(std::function<bool()> cb) {
+    async_thread_ = std::thread([&] { RunMainLoop(cb); });
 }

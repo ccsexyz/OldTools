@@ -134,6 +134,7 @@ void PollerEpoll::translateEvents(struct epoll_event &event, Channel *chan) {
 #endif
 
 void PollerEpoll::addChanel(Channel *chan) {
+    ClearUnuseVariableWarning(chan);
 #ifdef __linux__
     assert(chan && chan->getChanelFd() >= 0);
 
@@ -154,6 +155,7 @@ void PollerEpoll::addChanel(Channel *chan) {
 }
 
 void PollerEpoll::removeChanel(Channel *chan) {
+    ClearUnuseVariableWarning(chan);
 #ifdef __linux__
     assert(chan && chan->getChanelFd() >= 0);
 
@@ -174,6 +176,7 @@ void PollerEpoll::removeChanel(Channel *chan) {
 }
 
 void PollerEpoll::updateChanel(Channel *chan) {
+    ClearUnuseVariableWarning(chan);
 #ifdef __linux__
     assert(chan && chan->getChanelFd() >= 0);
 
@@ -458,6 +461,7 @@ void PollerKevent::updateKevents() {
 #endif
 
 void PollerKevent::addChanel(Channel *ch) {
+    ClearUnuseVariableWarning(ch);
 #ifdef __APPLE__
     assert(ch && ch->getChanelFd() >= 0);
     verbose("add chanel %p", ch);
@@ -479,6 +483,7 @@ void PollerKevent::addChanel(Channel *ch) {
 }
 
 void PollerKevent::removeChanel(Channel *ch) {
+    ClearUnuseVariableWarning(ch);
 #ifdef __APPLE__
     assert(ch && ch->getChanelFd() >= 0);
 
@@ -505,6 +510,7 @@ void PollerKevent::removeChanel(Channel *ch) {
 }
 
 void PollerKevent::updateChanel(Channel *ch) {
+    ClearUnuseVariableWarning(ch);
 #ifdef __APPLE__
     if (!ch->isEventsChanged()) {
         // return;

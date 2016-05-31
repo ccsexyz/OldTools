@@ -315,3 +315,47 @@ ssize_t Connection::tryWrit(int fd) {
     }
     return bytes;
 }
+
+void Connection::sync_send(Buffer &buffer) {
+    std::mutex m;
+    std::condition_variable c;
+    std::atomic_bool flag(false);
+
+    suspendWrit(false);
+    poller_->runEventHandler([&] { send(buffer); });
+    onWrit([&](ConnPtr) {
+        std::lock_guard<std::mutex> G_(m);
+        flag = true;
+        c.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lck(m);
+    c.wait(lck, [&]() -> bool { return flag; });
+    onWrit(nullptr);
+}
+
+Buffer &Connection::sync_read() {
+    std::mutex m;
+    std::condition_variable c;
+    std::atomic_bool flag(false);
+    Buffer *pbuffer = nullptr;
+
+    suspendRead(false);
+    onRead([&](ConnPtr conn) {
+        std::lock_guard<std::mutex> G_(m);
+        pbuffer = &(conn->read());
+        flag = true;
+        c.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lck(m);
+    c.wait(lck, [&]() -> bool { return flag; });
+    onRead(nullptr);
+    suspendRead();
+
+    return *pbuffer;
+}
+
+void Connection::send(const std::string &str) {
+    send(str.data(), str.length());
+}

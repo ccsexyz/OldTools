@@ -23,6 +23,10 @@ public:
 
     void init();
 
+    template <typename T> void send(const T &t) {
+        send(reinterpret_cast<void *>(&t), sizeof(t));
+    }
+
     void send(void *base, off_t len) {
         send(static_cast<const char *>(base), len);
     }
@@ -37,7 +41,13 @@ public:
 
     void send(const char c);
 
+    void send(const std::string &str);
+
     Buffer &read();
+
+    Buffer &sync_read();
+
+    void sync_send(Buffer &buffer);
 
     Connection &onRead(ConnCallback cb);
 

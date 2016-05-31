@@ -22,6 +22,7 @@ public:
         : EventLoop(n, ChooserStrings[chooserString]) {}
     ~EventLoop();
     void RunMainLoop(std::function<bool()> cb = [] { return true; });
+    void RunAsyncLoop(std::function<bool()> cb = [] { return true; });
     std::shared_ptr<Poller> &getSuitablePoller(int fd);
     std::shared_ptr<Poller> &getSuitablePoller2(int fd);
     std::shared_ptr<Poller> &getFirstPoller();
@@ -47,6 +48,7 @@ private:
     std::function<bool()> insistFunctor_;
     std::vector<std::shared_ptr<Poller>> pollers_;
     std::vector<std::thread> threads_;
+    std::thread async_thread_;
 };
 }
 
