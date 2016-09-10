@@ -4,7 +4,7 @@ using namespace Liby;
 
 int main() {
     EventLoop loop;
-    auto chat_server = loop.creatTcpServer("localhost", "9379");
+    auto chat_server = loop.creatTcpServer("0.0.0.0", "9379");
     chat_server->onAccept(
         [](std::shared_ptr<Connection> conn) { conn->suspendRead(false); });
     chat_server->onRead(
