@@ -23,13 +23,33 @@ var (
 
 func main() {
 	checkArgs()
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", os.Args[1])
+
+	var bytesLimit int
+	if len(os.Args) == 3 {
+		bytesLimit, _ = strconv.Atoi(os.Args[2])
+	} else {
+		bytesLimit = 0
+	}
+	runLimitRateRoutine(bytesLimit)
+
+	runSocksProxy(os.Args[1])
+}
+
+func init() {
+	readLimitChan = make(chan rateInfo, 16)
+	writLimitChan = make(chan rateInfo, 16)
+}
+
+func runLimitRateRoutine(bytesLimit int) {
+	go limitRateRoutine("read", readLimitChan, bytesLimit)
+	go limitRateRoutine("write", writLimitChan, bytesLimit)
+}
+
+func runSocksProxy(service string) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
 	checkErr(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkErr(err)
-
-	go limitRateRoutine("read", readLimitChan)
-	go limitRateRoutine("write", writLimitChan)
 
 	for {
 		conn, err := listener.Accept()
@@ -38,43 +58,30 @@ func main() {
 	}
 }
 
-func init() {
-	readLimitChan = make(chan rateInfo, 16)
-	writLimitChan = make(chan rateInfo, 16)
-}
-
 func handleClient(conn net.Conn) {
 	defer conn.Close()
 
-	buf := make([]byte, 128)
-	if len, err := io.ReadAtLeast(conn, buf, 9); len != 9 || err != nil {
+	ver := make([]byte, 1)
+	if len, err := io.ReadAtLeast(conn, ver[0:1], 1); len != 1 || err != nil {
 		return
 	}
 
-	ver := uint8(buf[0])
-	command := uint8(buf[1])
+	var ok bool
+	var conn2 net.Conn
 
-	if ver != 4 || command != 1 {
-		fmt.Println("bad version or command")
-		return
-	}
-
-	host := net.IP(buf[4:8]).String()
-	port := binary.BigEndian.Uint16(buf[2:4])
-	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-
-	conn2, err := net.Dial("tcp4", addr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Connect error: %s\n", err.Error())
-		return
+	if ver[0] == 4 {
+		conn2, ok = socks4HandShake(conn)
+	} else if ver[0] == 5 {
+		conn2, ok = socks5HandShake(conn)
 	} else {
-		_, err := conn.Write([]byte{0x0, 0x5A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "write error: %s\n", err.Error())
-			conn2.Close()
-			return
-		}
+		return
 	}
+
+	if ok == false {
+		return
+	}
+
+	defer conn2.Close()
 
 	queue1 := make(chan string, 4)
 	queue2 := make(chan string, 4)
@@ -109,7 +116,7 @@ func handleClient(conn net.Conn) {
 
 			if err != nil {
 				finish <- true
-				return
+				break
 			} else {
 				limit <- rateInfo{len, pending}
 				<-pending
@@ -122,24 +129,132 @@ func handleClient(conn net.Conn) {
 	f(conn, queue1, queue2, finished, readLimitChan)
 }
 
-func limitRateRoutine(prefix string, ch chan rateInfo) {
+func socks4HandShake(conn net.Conn) (conn2 net.Conn, ok bool) {
+	ok = false
+	buf := make([]byte, 128)
+	if len, err := io.ReadAtLeast(conn, buf, 8); len != 8 || err != nil {
+		return
+	}
+
+	command := buf[0]
+	if command != 1 {
+		return
+	}
+
+	host := net.IP(buf[3:7]).String()
+	port := binary.BigEndian.Uint16(buf[1:3])
+	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
+
+	conn2, err := net.Dial("tcp4", addr)
+	if err == nil {
+		_, err := conn.Write([]byte{0x0, 0x5A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0})
+		if err != nil {
+			conn2.Close()
+		} else {
+			ok = true
+		}
+	}
+
+	return
+}
+
+func socks5HandShake(conn net.Conn) (conn2 net.Conn, ok bool) {
+	ok = false
+	buf := make([]byte, 512)
+	if len, err := io.ReadAtLeast(conn, buf[0:1], 1); len != 1 || err != nil {
+		return
+	}
+
+	nmethods := int(buf[0])
+
+	if len, err := io.ReadAtLeast(conn, buf[0:nmethods], nmethods); len != nmethods || err != nil {
+		return
+	}
+
+	if method := buf[0]; method != 0 {
+		return
+	}
+
+	if _, err := conn.Write([]byte{0x5, 0x0}); err != nil {
+		return
+	}
+
+	if len, err := io.ReadAtLeast(conn, buf[0:6], 6); len != 6 || err != nil {
+		return
+	}
+
+	ver := buf[0]
+	cmd := buf[1]
+	atyp := buf[3]
+
+	if ver != 0x5 || cmd != 0x1 || (atyp != 0x1 && atyp != 0x3) {
+		return
+	}
+
+	var host string
+	var port uint16
+	var addr string
+	var portSlice []byte
+
+	if atyp == 0x1 {
+		if _, err := io.ReadAtLeast(conn, buf[6:10], 4); err != nil {
+			return
+		}
+
+		host = net.IP(buf[4:8]).String()
+		port = binary.BigEndian.Uint16(buf[8:10])
+		addr = net.JoinHostPort(host, strconv.Itoa(int(port)))
+
+		portSlice = buf[8:10]
+	} else if atyp == 0x3 {
+		len := int(buf[4])
+		if l, err := io.ReadAtLeast(conn, buf[6:len+7], len+1); l != len+1 || err != nil {
+			return
+		}
+
+		host = string(buf[5 : len+5])
+		port = binary.BigEndian.Uint16(buf[len+5 : len+7])
+		addr = net.JoinHostPort(host, strconv.Itoa(int(port)))
+
+		portSlice = buf[len+5 : len+7]
+	}
+
+	conn2, err := net.Dial("tcp4", addr)
+	if err != nil {
+		return
+	}
+
+	_, err = conn.Write([]byte{0x5, 0x0, 0x0, 0x3, byte(len(host))})
+	if err != nil {
+		conn2.Close()
+		return
+	}
+
+	if _, err = conn.Write([]byte(host)); err != nil {
+		conn2.Close()
+		return
+	}
+
+	if _, err = conn.Write(portSlice); err != nil {
+		conn2.Close()
+		return
+	}
+
+	ok = true
+	return
+}
+
+func limitRateRoutine(prefix string, ch chan rateInfo, bytesLimit int) {
 	t := time.NewTicker(time.Second)
-	totalBytes := 0
+	// totalBytes := 0
 	bytesPerSecond := 0
 	waitedSeconds := 0
 	pendingInfoList := list.New()
 
-	var bytesLimit int
-	if len(os.Args) == 3 {
-		bytesLimit, _ = strconv.Atoi(os.Args[2])
-	} else {
-		bytesLimit = 0
-	}
-
 	do := func(info rateInfo) {
 		bytes := info.bytes
 		ch := info.ch
-		totalBytes += bytes
+		// totalBytes += bytes
 		bytesPerSecond += bytes
 		ch <- true
 	}
@@ -190,6 +305,13 @@ func checkArgs() {
 }
 
 func checkErr(err error) {
+	if err != nil {
+		logErr(err)
+		os.Exit(1)
+	}
+}
+
+func logErr(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
 	}
